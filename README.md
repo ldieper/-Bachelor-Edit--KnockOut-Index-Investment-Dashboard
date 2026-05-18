@@ -1,4 +1,4 @@
-# KnockOut-Index-Investment-Dashboard
+# (Bachelor-Edit) KnockOut-Index-Investment-Dashboard
 
 This **study project** is a Streamlit-based dashboard for simulating leveraged investments in major stock indices during market corrections. It allows users to explore how leveraged products would have performed when invested in downside phases and recovery periods.
 
