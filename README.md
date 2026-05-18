@@ -92,4 +92,4 @@ Checking for the existence of the index data and database. Missing data is being
 ## Additional resources
 
 [Streamlit documentation](https://docs.streamlit.io/) <br>
-[Yfinance documentation](https://ranaroussi.github.io/yfinance/)# -Bachelor-Edit--KnockOut-Index-Investment-Dashboard
+[Yfinance documentation](https://ranaroussi.github.io/yfinance/)
