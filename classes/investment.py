@@ -74,7 +74,7 @@ class Investment:
                 self.index_values[self.i] * (1 - 1 / self.selected_leverage)
             )
         elif i > self.i:
-            knockout_daily_increase = (self.current_knockout_barrier * 0.05) / 360
+            knockout_daily_increase = (self.current_knockout_barrier * 0.05 / 252) #Trading-Market years have around 252 trading days because of weekends and holidays
             self.current_knockout_barrier += knockout_daily_increase
 
 

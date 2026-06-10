@@ -289,10 +289,11 @@ with bottom:
         df_display["closing_reason"] = df_display["closing_reason"].apply(
             lambda x: closing_reason_map.get(float(x), "Unbekannt") if pd.notna(x) else "Aktiv"
         )
-        
+
+
         #Table to click on all possible investments of choosen index
         event = st.dataframe(
-            df_display[["inv_id", "closing_reason"]],
+            df_display[["inv_id", "closing_reason", "annual_barrier_increase_pct"]],
             hide_index=True,
             width="stretch",
             on_select="rerun",
@@ -312,6 +313,8 @@ with bottom:
 
         if selected_row is not None and selected_row < len(df_filtered):
             selected_inv_id = df_filtered.iloc[selected_row]['inv_id']
+
+            
             
             # Create and display the investment detail chart
             detail_chart = create_investment_detail_plot(df_investment, df_all_index, selected_inv_id)
@@ -319,6 +322,8 @@ with bottom:
                 st.altair_chart(detail_chart, width="stretch")
             
             selected_row_data = df_filtered.iloc[selected_row]
+
+            avg_annual_barrier_increase = selected_row_data.get('annual_barrier_increase_pct', 0)
             
             # Map closing reason to readable text
             closing_reason_value = selected_row_data['closing_reason']
@@ -334,6 +339,8 @@ with bottom:
             with col1:
                 starting_date = selected_row_data['starting_date']
                 st.metric("Start", f"{starting_date}")
+
+                st.metric("Avg. Annual Barrier Increase", f"{avg_annual_barrier_increase:.2f} %")
 
             with col2:
                 starting_investment = round(selected_row_data['starting_investment'], 2)

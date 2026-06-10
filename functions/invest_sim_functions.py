@@ -178,8 +178,28 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
         )
         df_plot_filtered = filter_nearest_barriers(df_plot,top_n=1)
         
+        barrier_growth = (
+            df_investment[["inv_id", "date", "knockout_barrier"]]
+            .dropna(subset=["knockout_barrier"])
+            .groupby("inv_id")
+            .agg(
+                start_barrier=("knockout_barrier", "first"),
+                end_barrier=("knockout_barrier", "last"),
+                start_date=("date", "first"),
+                end_date=("date", "last")
+            )
+            .reset_index()
+        )
+        barrier_growth["duration_days"] = (barrier_growth["end_date"] - barrier_growth["start_date"]).dt.days
+        barrier_growth["annual_barrier_increase_pct"] = barrier_growth.apply(
+            lambda row: round(((row["end_barrier"] / row["start_barrier"]) ** (365 / row["duration_days"]) - 1) * 100, 2)
+            if row["duration_days"] > 0 and row["start_barrier"] > 0 else 0,
+            axis=1
+        )
+
         df_table = df_investment[df_investment["closing_reason"] != 2][["inv_id", "active", "closing_reason", "starting_date", "closing_date", "profit", "current_value", "starting_investment"]].copy()
         df_table = df_table.groupby("inv_id").last().reset_index(drop=False)
+        df_table = df_table.merge(barrier_growth[["inv_id", "annual_barrier_increase_pct"]], on="inv_id", how="left")
         df_table["starting_date"] = df_table["starting_date"].dt.strftime("%d.%m.%y")
         df_table["closing_date"] = df_table["closing_date"].dt.strftime("%d.%m.%y")
         df_table["current_value"] = df_table["current_value"].where(df_table["active"], 0)
