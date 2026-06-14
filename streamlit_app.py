@@ -104,6 +104,27 @@ remaining_budget = current["remaining_budget"]
 cumulative_value = current["cumulative_value"]
 metrics = current["metrics"]
 
+df_simple_invest = current.get("df_simple_invest")
+if df_simple_invest is None:
+    df_simple_invest = run_simple_invests_simulation(
+        df_all_index,
+        500,
+        expense_ratio=0.002,
+        annual_dividend_yield=0.01,
+        allow_fractional=True
+    )
+
+# prepare a simple plot dataset for the simple investment section
+if "date" in df_simple_invest.columns:
+    df_plot_simple_invest = pd.merge(
+        df_all_index[["date", "index_value"]],
+        df_simple_invest[["date", "total_value"]],
+        on="date",
+        how="left"
+    )
+else:
+    df_plot_simple_invest = df_all_index[["date", "index_value"]].copy()
+
 
 #Dynamic Header (historic or up to date)
 last_trading_day = get_last_trading_day().date()
@@ -177,6 +198,49 @@ with top:
     )
 
     st.altair_chart(combined_chart, width="stretch")
+
+    #Dispplay of the simple, monthly invest in the same selected_index
+    st.subheader(f"Simple performance - {st.session_state.selected_index}")
+
+    #Offset of Legend to be in top left corner
+    legend = alt.Legend(
+        orient="none",
+        legendX=10,
+        legendY=10
+    )
+
+    #Base chart
+    base = alt.Chart(df_plot_simple_invest).encode(
+        x=alt.X("date:T", title="Datum", axis=alt.Axis(format="%d %b %y"))
+    )
+
+    #Plot index value on the left axis
+    left_axis_group = base.mark_line().encode(
+        y=alt.Y("index_value:Q", title="Index value"),
+        color=alt.value("#BA2BAC")
+    )
+
+    #Plot simple investment portfolio value on the right axis
+    right_axis_group = alt.Chart(df_simple_invest).transform_calculate(
+        lines="'Investment'"
+    ).mark_line(size=2, color="#e2e22e").encode(
+        x="date:T",
+        y=alt.Y("total_value:Q", title="Portfolio Value (€)"),
+        tooltip=["date:T", "total_value:Q"]
+    )
+
+    #Combining Charts to be displayed as one
+    combined_chart = alt.layer(
+        left_axis_group,
+        right_axis_group
+    ).resolve_scale(
+        y="independent"
+    )
+
+    st.altair_chart(combined_chart, width="stretch")
+
+
+
     
 
 #Metrics and settings

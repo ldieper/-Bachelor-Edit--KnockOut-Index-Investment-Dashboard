@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 
 # Loads the past 20years of the chosen products and saves them once. (update for newer data must be done manually!)
-def download_data(tickers=["^GDAXI", "^GSPC", "^HSI"]): #^GDAXI = DAX, ^GSPC = S&P500, ^HSI = Hang Seng Index; e.g. ^NDX = Nasdaq100, STOXX50E = EuroStoxx50 etc.
+def download_data(tickers=["^GDAXI", "^GSPC", "^HSI", "^STOXX50E", "EUNL.DE", "ACWI.MI"]): #^GDAXI = DAX, ^GSPC = S&P500, ^HSI = Hang Seng Index; e.g. ^NDX = Nasdaq100, STOXX50E = EuroStoxx50 etc.
     for ticker in tickers:
         df = yf.download(
             ticker,

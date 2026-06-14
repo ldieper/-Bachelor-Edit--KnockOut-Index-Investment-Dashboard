@@ -125,6 +125,7 @@ def run_simulation(source, filter, selected_leverage, selected_budget, remaining
                 "active": inv.active,
                 "cumulative_investment_value": cumulative_value,
                 "starting_date": inv.starting_date,
+                "closing_date": None,
             })
     df_investment = pd.DataFrame(rows)
 
@@ -164,6 +165,13 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
             remaining_budget  
         )
 
+        df_simple_invest = run_simple_invests_simulation(
+            df_all_index,
+            selected_budget,
+            expense_ratio=0.002, #0,2% of Shares = costs
+            annual_dividend_yield=0.01, #1% dividend per Share
+            allow_fractional=True)
+
         # Calculate metrics
         metrics = calculate_metrics(df_investment)
 
@@ -201,7 +209,7 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
         df_table = df_table.groupby("inv_id").last().reset_index(drop=False)
         df_table = df_table.merge(barrier_growth[["inv_id", "annual_barrier_increase_pct"]], on="inv_id", how="left")
         df_table["starting_date"] = df_table["starting_date"].dt.strftime("%d.%m.%y")
-        df_table["closing_date"] = df_table["closing_date"].dt.strftime("%d.%m.%y")
+        df_table["closing_date"] = pd.to_datetime(df_table["closing_date"], errors='coerce').dt.strftime("%d.%m.%y")
         df_table["current_value"] = df_table["current_value"].where(df_table["active"], 0)
         df_table = df_table.sort_values(by=["inv_id"], ascending=True)
 
@@ -216,9 +224,101 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
             "remaining_budget": remaining_budget,  
             "cumulative_value": cumulative_value,
             "metrics": metrics,
-            "df_plot_filtered": df_plot_filtered
+            "df_plot_filtered": df_plot_filtered,
+
+            "df_simple_invest": df_simple_invest
         }
 
     return results
 
+def run_simple_invests_simulation(source, monthly_budget, reinvest_pct=1.0, expense_ratio=0.02, annual_dividend_yield=0.01, allow_fractional=True):
+
+    """
+    Simulate a simple ETF savings plan (Sparplan) that:
+    - invests `monthly_budget` every ~20 trading days
+    - supports fractional shares with `allow_fractional`
+    - supports "thesaurierend" reinvestment via `reinvest_pct` (0.0-1.0)
+    - charges an annual `expense_ratio` (as decimal, e.g. 0.005 for 0.5%) applied pro-rata each trading day
+    - optional `annual_dividend_yield` which is distributed monthly and partially reinvested
+
+    Returns: df_simple_invest
+    """
+
+    df = source.copy()
+
+    # Convert to numpy arrays
+    index_values = df["index_value"].values
+    dates = df["date"].values
+
+    rows = []
+    months_count = 0
+
+    shares = 0.0  # number of shares held (float when fractional allowed)
+    cash = 0.0   # cash leftover from buys and dividends
+    total_invested = 0.0
+
+    # assume ~252 trading days per year for expense/dividend pro-rata
+    trading_days_per_year = 252
+
+    for i in df.index:
+        price = float(index_values[i])
+
+        if i % 20 == 0:
+            months_count += 1
+
+            # dividends are distributed monthly on existing holdings
+            if annual_dividend_yield and shares > 0:
+                monthly_dividend = (annual_dividend_yield / 12.0) * (shares * price)
+                reinvest_amount = monthly_dividend * float(reinvest_pct)
+                cash += monthly_dividend - reinvest_amount
+
+                if reinvest_amount > 0 and price > 0:
+                    if allow_fractional:
+                        shares += reinvest_amount / price
+                    else:
+                        shares_to_buy = int(reinvest_amount // price)
+                        cost = shares_to_buy * price
+                        if shares_to_buy > 0:
+                            shares += shares_to_buy
+                            cash += reinvest_amount - cost
+
+            cash += monthly_budget
+
+            # Buy shares with available cash
+            if price > 0 and cash > 0:
+                if allow_fractional:
+                    shares_to_buy = cash / price
+                    cost = shares_to_buy * price
+                    shares += shares_to_buy
+                    cash -= cost
+                    total_invested += monthly_budget
+                else:
+                    shares_to_buy = int(cash // price)
+                    cost = shares_to_buy * price
+                    if shares_to_buy > 0:
+                        shares += shares_to_buy
+                        cash -= cost
+                        total_invested += monthly_budget
+
+        # daily expense fee based on current holdings value
+        if expense_ratio and shares > 0:
+            daily_fee = (expense_ratio / trading_days_per_year) * (shares * price)
+            # charge fee from cash; allow cash to go negative rather than forcing a sale
+            cash -= daily_fee
+
+        total_value = shares * price + cash
+
+        rows.append({
+            "date": dates[i],
+            "month_id": months_count,
+            "shares": shares,
+            "cash": cash,
+            "price": price,
+            "total_value": total_value,
+            "total_invested": total_invested,
+        })
+
+    df_simple_invest = pd.DataFrame(rows)
+
+    return df_simple_invest
 
