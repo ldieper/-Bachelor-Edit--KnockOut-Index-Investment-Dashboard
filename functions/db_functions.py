@@ -14,6 +14,7 @@ def load_from_db():
     try:
         df = con.execute("SELECT * FROM simulations").fetchdf()
         results = {}
+        has_simple_invest_path = "df_simple_invest_path" in df.columns
         for _, row in df.iterrows(): #Iterating through rows
 
             key = (row["index_name"], row["leverage"])
@@ -25,7 +26,8 @@ def load_from_db():
                 "remaining_budget": row["remaining_budget"],
                 "cumulative_value": row["cumulative_value"],
                 "metrics": pickle.loads(row["metrics_pickle"]),
-                "df_plot_filtered": pd.read_parquet(row["df_plot_filtered_path"])
+                "df_plot_filtered": pd.read_parquet(row["df_plot_filtered_path"]),
+                "df_simple_invest": pd.read_parquet(row["df_simple_invest_path"]) if has_simple_invest_path and pd.notna(row["df_simple_invest_path"]) else None
             }
         return results
     

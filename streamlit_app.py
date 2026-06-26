@@ -73,9 +73,9 @@ def data_refresh():
     missing_keys = expected_keys - set(st.session_state.all_results.keys())
 
     #If not all indices are loaded
-    if missing_keys: 
+    if missing_keys:
         with st.spinner("Updating data.. "):
-            new_results = precompute_all_simulations(keys_to_compute=missing_keys) 
+            new_results = precompute_all_simulations(keys_to_compute=missing_keys)
             store_to_db(new_results)
             st.session_state.all_results.update(new_results)
             st.cache_data.clear()
@@ -104,6 +104,27 @@ remaining_budget = current["remaining_budget"]
 cumulative_value = current["cumulative_value"]
 metrics = current["metrics"]
 
+df_simple_invest = current.get("df_simple_invest")
+if df_simple_invest is None:
+    df_simple_invest = run_simple_invests_simulation(
+        df_all_index,
+        500,
+        expense_ratio=0.002,
+        annual_dividend_yield=0.01,
+        allow_fractional=True
+    )
+
+# prepare a simple plot dataset for the simple investment section
+if "date" in df_simple_invest.columns:
+    df_plot_simple_invest = pd.merge(
+        df_all_index[["date", "index_value"]],
+        df_simple_invest[["date", "total_value"]],
+        on="date",
+        how="left"
+    )
+else:
+    df_plot_simple_invest = df_all_index[["date", "index_value"]].copy()
+
 
 #Dynamic Header (historic or up to date)
 last_trading_day = get_last_trading_day().date()
@@ -122,6 +143,32 @@ bottom = st.container(border=True)
 
 
 with top:
+
+    #css for metric buttons (Border on Hover) | Not needed, only aesthetic use
+    st.markdown("""
+    <style>
+
+    div[data-testid="stMetric"] {
+        padding: 12px;
+        border: 2px solid transparent;
+        border-radius: 14px;
+        /* box-shadow: 0 2px 10px rgba(0,0,0,0.08); */
+        transition: all 0.2s ease;
+    }
+
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px) scale(1.02);
+        border: 2px solid #3D4044;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="blue-section">', unsafe_allow_html=True)
+
+
+
     st.subheader(f"Index performance - {st.session_state.selected_index}")
 
     #Offset of Legend to be in top left corner
@@ -177,38 +224,12 @@ with top:
     )
 
     st.altair_chart(combined_chart, width="stretch")
-    
-
-#Metrics and settings
-with mid:
-    #css for metric buttons (Border on Hover) | Not needed, only aesthetic use
-    st.markdown("""
-    <style>
-
-    div[data-testid="stMetric"] {
-        padding: 12px;
-        border: 2px solid transparent;
-        border-radius: 14px;
-        /* box-shadow: 0 2px 10px rgba(0,0,0,0.08); */
-        transition: all 0.2s ease;
-    }
-
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-2px) scale(1.02);
-        border: 2px solid #3D4044;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    }
-
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="blue-section">', unsafe_allow_html=True)
 
 
-    mid_left, mid_right = st.columns([0.7, 0.3])
+    top_left, top_right = st.columns([0.7, 0.3])
 
     #Metrics of total investment
-    with mid_left:
+    with top_left:
 
         with st.container(border=True):
 
@@ -237,10 +258,11 @@ with mid:
                 st.metric("Accessible budget", f"€ {remaining_budget:,.2f}".replace(",", " "))
                 st.metric("Monthly budget", f"€ 500,00")
                 #st.metric("Trades with not enough Budget to start", f"{metrics['not_enough_money_count']}")
-                
+
 
     #Settings for Dashboard
-    with mid_right:
+    with top_right:
+
         with st.container(border=True):
 
             st.subheader("Settings")
@@ -262,13 +284,90 @@ with mid:
                     [3, 5, 10],
                     key="selected_leverage"
                 )
-            
+
         with st.container(border=False):
             if st.button("Refresh Data"):
                 #st.session_state.refresh_data = True
                 data_refresh()
 
     st.markdown('</div>', unsafe_allow_html=True)
+
+
+#Metrics and settings
+with mid:
+
+    #Dispplay of the simple, monthly invest in the same selected_index
+    st.subheader(f"Simple performance - {st.session_state.selected_index}")
+
+    #Offset of Legend to be in top left corner
+    legend = alt.Legend(
+        orient="none",
+        legendX=10,
+        legendY=10
+    )
+
+    #Base chart
+    base = alt.Chart(df_plot_simple_invest).encode(
+        x=alt.X("date:T", title="Datum", axis=alt.Axis(format="%d %b %y"))
+    )
+
+    #Plot index value on the left axis
+    left_axis_group = base.mark_line().encode(
+        y=alt.Y("index_value:Q", title="Index value"),
+        color=alt.value("#BA2BAC")
+    )
+
+    #Plot simple investment portfolio value on the right axis
+    right_axis_group = alt.Chart(df_simple_invest).transform_calculate(
+        lines="'Investment'"
+    ).mark_line(size=2, color="#e2e22e").encode(
+        x="date:T",
+        y=alt.Y("total_value:Q", title="Portfolio Value (€)"),
+        tooltip=["date:T", "total_value:Q"]
+    )
+
+    #Combining Charts to be displayed as one
+    combined_chart = alt.layer(
+        left_axis_group,
+        right_axis_group
+    ).resolve_scale(
+        y="independent"
+    )
+
+    st.altair_chart(combined_chart, width="stretch")
+
+
+    mid_left, mid_right = st.columns([0.7, 0.3])
+
+    with mid_left:
+
+        total_months = df_simple_invest["month_id"].iloc[-1]
+        final_row = df_simple_invest.iloc[-1]
+
+        total_invested = final_row["total_invested"]
+        final_value = final_row["total_value"]
+        profit = final_value - total_invested
+        roi_percent = (profit / total_invested) * 100
+
+        with st.container(border=True):
+
+            st.subheader("Current metrics")
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric("Investment-Level", f"€ {round(final_value, 2):,.2f}".replace(",", " "))
+
+                current_index_value = float(df_plot_simple_invest["index_value"].iloc[-1])
+                st.metric("Index-Level", f"{current_index_value:,.3f}".replace(",", " "))
+
+            with col2:
+                st.metric("Profit", f"€ {profit:,.2f}".replace(",", " "))
+                st.metric("Monthly budget", f"€ 500,00")
+
+            with col3:
+                st.metric("ROI", f"{roi_percent:.2f} %", )
+                st.metric("Gesamtinvestition", f"€ {total_invested:,.2f}".replace(",", " "))
 
 
 #Metrics of individual investments
@@ -283,7 +382,7 @@ with bottom:
 
         #For better readability
         closing_reason_map = {0.0: "KnockOut", 1.0: "Sold", 2.0: "No Money", None: "Active"}
-        
+
         # Add mapped closing_reason column to display
         df_display = df_filtered.copy()
         df_display["closing_reason"] = df_display["closing_reason"].apply(
@@ -314,24 +413,24 @@ with bottom:
         if selected_row is not None and selected_row < len(df_filtered):
             selected_inv_id = df_filtered.iloc[selected_row]['inv_id']
 
-            
-            
+
+
             # Create and display the investment detail chart
             detail_chart = create_investment_detail_plot(df_investment, df_all_index, selected_inv_id)
             if detail_chart:
                 st.altair_chart(detail_chart, width="stretch")
-            
+
             selected_row_data = df_filtered.iloc[selected_row]
 
             avg_annual_barrier_increase = selected_row_data.get('annual_barrier_increase_pct', 0)
-            
+
             # Map closing reason to readable text
             closing_reason_value = selected_row_data['closing_reason']
             if closing_reason_value is None or pd.isna(closing_reason_value):
                 closing_reason_text = "Active"
             else:
                 closing_reason_text = closing_reason_map.get(float(closing_reason_value), "Unknown")
-            
+
 
             col1, col2, col3 ,col4, col5, col6 = st.columns(6)
 
@@ -363,9 +462,9 @@ with bottom:
                 st.metric("Profit", f"€ {profit_value:,.2f}".replace(",", " "))
 
             with col6:
-                indiv_return  = round( ((profit_value / starting_investment if starting_investment != 0 else 0)*100), 2)   
+                indiv_return  = round( ((profit_value / starting_investment if starting_investment != 0 else 0)*100), 2)
                 st.metric("ROI", f"{indiv_return} %")
-                
+
         else:
             st.info("Choose an investment from the table")
 
