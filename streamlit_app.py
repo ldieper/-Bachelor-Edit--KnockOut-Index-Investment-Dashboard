@@ -184,7 +184,7 @@ with top:
         x=alt.X("date:T", title="Datum", axis=alt.Axis(format="%d %b %y"))
     )
 
-    #Group for the indipendent left axis
+    #Group for the indipendent left axis ł
     left_axis_group = alt.layer(
         base.transform_calculate(lines="'Index'").mark_line().encode(
             y=alt.Y("index_value:Q", title="Index & Barrier Level"),
