@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-from functions.yfinance_loader import *
+from .yfinance_loader import *
 
 #Map of the downloaded indices
 def get_index_map(folder="index_data"):

@@ -37,6 +37,9 @@ if "simulations_loaded" not in st.session_state:
 if "all_results" not in st.session_state:
     st.session_state.all_results = None
 
+if "selected_cost" not in st.session_state:
+    st.session_state.selected_cost = 5
+
 
 
 
@@ -49,7 +52,8 @@ if st.session_state.selected_index is not None:
 
         if missing_keys: #Data from DB is not complete/empty -> New Data needs to be calculated
             with st.spinner("Precomputing.. " + get_random_phrase()):
-                new_results = precompute_all_simulations(keys_to_compute=missing_keys) #if db was empty: missing keys = all available keys
+                annual_cost = st.session_state.selected_cost / 100
+                new_results = precompute_all_simulations(keys_to_compute=missing_keys, annual_cost=annual_cost) #if db was empty: missing keys = all available keys
                 store_to_db(new_results)
                 st.session_state.all_results.update(new_results)
                 st.cache_data.clear()
@@ -75,16 +79,13 @@ def data_refresh():
     #If not all indices are loaded
     if missing_keys:
         with st.spinner("Updating data.. "):
-            new_results = precompute_all_simulations(keys_to_compute=missing_keys)
-            store_to_db(new_results)
+            annual_cost = st.session_state.selected_cost / 100
+            new_results = precompute_all_simulations(keys_to_compute=missing_keys, debug_index=None, debug_leverages=None, annual_cost=annual_cost)
             st.session_state.all_results.update(new_results)
             st.cache_data.clear()
 
     #st.session_state.refresh_data = False #Deactivating button to be cklickable again
     st.session_state.simulations_loaded = True
-
-    # Force rerun
-    st.rerun()
 
 
 #If data is still not loaded: Error
@@ -217,8 +218,8 @@ with top:
 
     #Combining Charts to be displayed as one
     combined_chart = alt.layer(
-        left_axis_group,
-        right_axis_group
+        left_axis_group#,
+        #right_axis_group
     ).resolve_scale(
         y="independent"
     )
@@ -267,7 +268,7 @@ with top:
 
             st.subheader("Settings")
 
-            col1, col2 = st.columns(2)
+            col1, col2 , col3 = st.columns(3)
 
             index_map = get_index_map()
 
@@ -283,6 +284,14 @@ with top:
                     "Leverage",
                     [3, 5, 10],
                     key="selected_leverage"
+                )
+            with col3:
+                st.radio(
+                    "annual_KO_cost in %",
+                    [2, 3, 4, 5, 6, 7],
+                    index=5,
+                    key="selected_cost",
+                    on_change=data_refresh
                 )
 
         with st.container(border=False):

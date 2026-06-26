@@ -68,13 +68,13 @@ class Investment:
     def get_current_knockout_barrier(self):
         return round(self.current_knockout_barrier, 3)
 
-    def update_current_knockout_barrier(self, i):
+    def update_current_knockout_barrier(self, i, annual_barrier_increase_pct=0.05):
         if i == self.i:
             self.current_knockout_barrier = (
                 self.index_values[self.i] * (1 - 1 / self.selected_leverage)
             )
         elif i > self.i:
-            knockout_daily_increase = (self.current_knockout_barrier * 0.05 / 252) #Trading-Market years have around 252 trading days because of weekends and holidays
+            knockout_daily_increase = (self.current_knockout_barrier * annual_barrier_increase_pct / 252) #Trading-Market years have around 252 trading days because of weekends and holidays
             self.current_knockout_barrier += knockout_daily_increase
 
 
