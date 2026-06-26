@@ -92,6 +92,8 @@ def calculate_metrics(df_investment):
 
     total_return = round(final_profit / total_invested_sum * 100, 2) if total_invested_sum > 0 else 0
 
+    
+
     return {
         "closed_trades": closed_trades,
         "sells_count": sells_count,
