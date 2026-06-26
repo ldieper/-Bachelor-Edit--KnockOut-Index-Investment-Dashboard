@@ -1,10 +1,10 @@
 import pandas as pd
-from functions.df_functions import *
+from .df_functions import *
 from classes.investment import Investment
-from functions.plot_functions import filter_nearest_barriers
+from .plot_functions import filter_nearest_barriers
 
 #Function fo running the investment simulation for all investments and returninng the dataframe
-def run_simulation(source, filter, selected_leverage, selected_budget, remaining_budget):
+def run_simulation(source, filter, selected_leverage, selected_budget, remaining_budget, annual_cost):
     df = source.copy()
     
     # Convert to numpy arrays
@@ -51,7 +51,7 @@ def run_simulation(source, filter, selected_leverage, selected_budget, remaining
                 continue
 
             old_value = inv.get_investment_value()
-            inv.update_current_knockout_barrier(i=i)
+            inv.update_current_knockout_barrier(i=i, annual_barrier_increase_pct = annual_cost)
             inv.update_investment_value(i=i)
             inv.update_leverage(i=i)
             inv.update_profit()
@@ -132,7 +132,7 @@ def run_simulation(source, filter, selected_leverage, selected_budget, remaining
     return remaining_budget, df_investment
 
 #Running simulation for all possible indices and leverage options
-def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_leverages=None): #debug_index="GDAXI", debug_leverages=3
+def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_leverages=None, annual_cost=0.05): #debug_index="GDAXI", debug_leverages=3
     index_map = get_index_map()
 
     #Debug mode for especially returning specific inndex and leverage (also good for faster loaing times while fixing other bugs)
@@ -162,7 +162,8 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
             mask,
             leverage,
             selected_budget,
-            remaining_budget  
+            remaining_budget,
+            annual_cost  
         )
 
         df_simple_invest = run_simple_invests_simulation(
