@@ -93,8 +93,16 @@ if st.session_state.selected_index is None or st.session_state.all_results is No
     st.error("Data not loaded properly. Selected index or results are missing.")
     st.stop()
 
+selected_key = (st.session_state.selected_index, st.session_state.selected_leverage)
+if selected_key not in st.session_state.all_results:
+    st.error(
+        f"No simulation results available for index {st.session_state.selected_index}. "
+        "Please refresh data or remove empty/invalid index files."
+    )
+    st.stop()
+
 #Storing calculations in current
-current = st.session_state.all_results[(st.session_state.selected_index, st.session_state.selected_leverage)]
+current = st.session_state.all_results[selected_key]
 
 
 #assigning current values for all indices and leverage
@@ -105,8 +113,37 @@ remaining_budget = current["remaining_budget"]
 cumulative_value = current["cumulative_value"]
 metrics = current["metrics"]
 
+# build summary table for all loaded combinations
+summary_rows = []
+for (index_name, leverage), result in st.session_state.all_results.items():
+    result_metrics = result.get("metrics", {})
+    df_table = result.get("df_table")
+    avg_barrier_increase = None
+    if df_table is not None and not df_table.empty and "annual_barrier_increase_pct" in df_table.columns:
+        avg_barrier_increase = round(df_table["annual_barrier_increase_pct"].dropna().mean(), 2)
+
+    summary_rows.append({
+        "Index": index_name,
+        "Leverage": leverage,
+        "Average Barrier Increase %": avg_barrier_increase,
+        "Cumulative Value": result.get("cumulative_value"),
+        "Final Profit": result_metrics.get("final_profit"),
+        "ROI %": result_metrics.get("total_return"),
+        "Trades": result_metrics.get("trades_count"),
+        "Knockouts": result_metrics.get("knockouts_count"),
+        "Sells": result_metrics.get("sells_count"),
+        "Active": result_metrics.get("active_trades"),
+        "Losses": result_metrics.get("loss_sum"),
+        "Total Invested": result_metrics.get("total_invested_sum"),
+    })
+
+summary_df = pd.DataFrame(summary_rows)
+if not summary_df.empty:
+    summary_df = summary_df.sort_values(["Index", "Leverage"]).reset_index(drop=True)
+
+
 df_simple_invest = current.get("df_simple_invest")
-if df_simple_invest is None:
+if df_simple_invest is None or (hasattr(df_simple_invest, 'empty') and df_simple_invest.empty):
     df_simple_invest = run_simple_invests_simulation(
         df_all_index,
         500,
@@ -116,7 +153,16 @@ if df_simple_invest is None:
     )
 
 # prepare a simple plot dataset for the simple investment section
-if "date" in df_simple_invest.columns:
+if df_simple_invest is not None and "date" in df_simple_invest.columns and not df_simple_invest.empty:
+    df_simple_invest = df_simple_invest.copy()
+    if "profit" not in df_simple_invest.columns:
+        df_simple_invest["profit"] = df_simple_invest["total_value"] - df_simple_invest["total_invested"]
+    if "roi_percent" not in df_simple_invest.columns:
+        df_simple_invest["roi_percent"] = df_simple_invest.apply(
+            lambda row: round((row["profit"] / row["total_invested"]) * 100, 2)
+            if row["total_invested"] else 0,
+            axis=1,
+        )
     df_plot_simple_invest = pd.merge(
         df_all_index[["date", "index_value"]],
         df_simple_invest[["date", "total_value"]],
@@ -218,8 +264,8 @@ with top:
 
     #Combining Charts to be displayed as one
     combined_chart = alt.layer(
-        left_axis_group#,
-        #right_axis_group
+        left_axis_group,
+        right_axis_group
     ).resolve_scale(
         y="independent"
     )
@@ -258,7 +304,6 @@ with top:
             with col5:
                 st.metric("Accessible budget", f"€ {remaining_budget:,.2f}".replace(",", " "))
                 st.metric("Monthly budget", f"€ 500,00")
-                #st.metric("Trades with not enough Budget to start", f"{metrics['not_enough_money_count']}")
 
 
     #Settings for Dashboard
@@ -298,6 +343,11 @@ with top:
             if st.button("Refresh Data"):
                 #st.session_state.refresh_data = True
                 data_refresh()
+
+    if not summary_df.empty:
+        with st.container(border=True):
+            st.subheader("All combinations summary")
+            st.dataframe(summary_df, use_container_width=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -350,13 +400,17 @@ with mid:
 
     with mid_left:
 
-        total_months = df_simple_invest["month_id"].iloc[-1]
-        final_row = df_simple_invest.iloc[-1]
+        if df_simple_invest is not None and not df_simple_invest.empty:
+            total_months = df_simple_invest["month_id"].iloc[-1]
+            final_row = df_simple_invest.iloc[-1]
+        else:
+            total_months = 0
+            final_row = pd.Series({"total_invested": 0, "total_value": 0})
 
         total_invested = final_row["total_invested"]
         final_value = final_row["total_value"]
         profit = final_value - total_invested
-        roi_percent = (profit / total_invested) * 100
+        roi_percent = (profit / total_invested) * 100 if total_invested > 0 else 0
 
         with st.container(border=True):
 
@@ -377,6 +431,20 @@ with mid:
             with col3:
                 st.metric("ROI", f"{roi_percent:.2f} %", )
                 st.metric("Gesamtinvestition", f"€ {total_invested:,.2f}".replace(",", " "))
+    
+        with st.container(border=True):
+            st.subheader("Final simple investment summary")
+            if df_simple_invest is not None and not df_simple_invest.empty:
+                final_summary = pd.DataFrame([final_row])
+                if "date" in final_summary.columns:
+                    final_summary["date"] = pd.to_datetime(final_summary["date"]).dt.strftime("%Y-%m-%d")
+                st.dataframe(
+                    final_summary[["total_invested", "total_value", "profit", "roi_percent"]],
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("No simple investment data available.")
 
 
 #Metrics of individual investments

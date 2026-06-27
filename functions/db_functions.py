@@ -15,6 +15,7 @@ def load_from_db():
         df = con.execute("SELECT * FROM simulations").fetchdf()
         results = {}
         has_simple_invest_path = "df_simple_invest_path" in df.columns
+        has_knockout_barriers_path = "knockout_barriers_path" in df.columns
         for _, row in df.iterrows(): #Iterating through rows
 
             key = (row["index_name"], row["leverage"])
@@ -27,7 +28,8 @@ def load_from_db():
                 "cumulative_value": row["cumulative_value"],
                 "metrics": pickle.loads(row["metrics_pickle"]),
                 "df_plot_filtered": pd.read_parquet(row["df_plot_filtered_path"]),
-                "df_simple_invest": pd.read_parquet(row["df_simple_invest_path"]) if has_simple_invest_path and pd.notna(row["df_simple_invest_path"]) else None
+                "df_simple_invest": pd.read_parquet(row["df_simple_invest_path"]) if has_simple_invest_path and pd.notna(row["df_simple_invest_path"]) else None,
+                "knockout_barriers": pd.read_parquet(row["knockout_barriers_path"]) if has_knockout_barriers_path and pd.notna(row["knockout_barriers_path"]) else None
             }
         return results
     
@@ -57,6 +59,7 @@ def store_to_db(results):
             df_investment_path VARCHAR,
             df_table_path VARCHAR,
             df_plot_filtered_path VARCHAR,
+            knockout_barriers_path VARCHAR,
                 
             remaining_budget DOUBLE,
             cumulative_value DOUBLE,
@@ -73,7 +76,8 @@ def store_to_db(results):
             "df_all_index",
             "df_investment",
             "df_table",
-            "df_plot_filtered"
+            "df_plot_filtered",
+            "knockout_barriers"
         ]:
             
             #Name conventions
@@ -81,21 +85,28 @@ def store_to_db(results):
                 parquet_dir,
                 f"{index_name}_{leverage}_{name}.parquet"
             )
-            value[name].to_parquet(
-                path,
-                compression="zstd",
-                index=False
-            )
-            paths[name] = path
+            
+            #Handle optional knockout_barriers dataframe
+            if name == "knockout_barriers" and (name not in value or value[name] is None or value[name].empty):
+                paths[name] = None
+            else:
+                if name in value and value[name] is not None:
+                    value[name].to_parquet(
+                        path,
+                        compression="zstd",
+                        index=False
+                    )
+                    paths[name] = path
 
         #Inserting values
-        con.execute("INSERT OR REPLACE INTO simulations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        con.execute("INSERT OR REPLACE INTO simulations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
             index_name,
             leverage,
             paths["df_all_index"],
             paths["df_investment"],
             paths["df_table"],
             paths["df_plot_filtered"],
+            paths.get("knockout_barriers"),
             value["remaining_budget"],
             value["cumulative_value"],
             pickle.dumps(value["metrics"]) #pickle because metrics are not a time-series

@@ -98,7 +98,7 @@ def run_simulation(source, filter, selected_leverage, selected_budget, remaining
             if inv.get_leverage() <= 1.5:
                 closing_value = inv.get_investment_value()
                 inv.reset_investment(type="sell")
-                cumulative_value -= closing_value
+                #cumulative_value -= closing_value
                 closing_date = dates[i]
                 rows.append({
                     "date": dates[i],
@@ -152,6 +152,10 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
             continue
         file_path = index_map[index_name]
         df_all_index = load_df(file_path)
+        if df_all_index is None or df_all_index.empty:
+            print(f"Skipping index {index_name} because the data file is empty or invalid.")
+            continue
+
         df_all_index, mask = prepare_investment_data(df_all_index)
 
         selected_budget = 500
@@ -226,7 +230,7 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
             "cumulative_value": cumulative_value,
             "metrics": metrics,
             "df_plot_filtered": df_plot_filtered,
-
+            "knockout_barriers": barrier_growth,
             "df_simple_invest": df_simple_invest
         }
 

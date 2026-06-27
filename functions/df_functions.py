@@ -28,7 +28,11 @@ def load_df(file_path):
         df = pd.read_parquet(file_path)
         df.columns = ["index_value"]
         df.index.name = "date"
-        return df.reset_index()
+        df = df.reset_index()
+        if df.empty:
+            print(f"Warning: loaded parquet {file_path} is empty")
+            return pd.DataFrame(columns=["date", "index_value"])
+        return df
 
     #Catching exception
     except Exception as error_message:
@@ -38,6 +42,10 @@ def load_df(file_path):
 
 #Setting the investmentpoints in the dataframe
 def prepare_investment_data(df_all_index):
+    if df_all_index is None or df_all_index.empty:
+        df_all_index = pd.DataFrame(columns=["date", "index_value", "index_growth", "index_investpoint", "yearly_high"])
+        return df_all_index, pd.Series(False, index=df_all_index.index)
+
     df_all_index["index_growth"] = df_all_index["index_value"].pct_change().fillna(0)
     
     df_all_index["index_investpoint"] = None

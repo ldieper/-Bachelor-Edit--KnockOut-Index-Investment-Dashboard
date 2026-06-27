@@ -1,76 +1,74 @@
-from pathlib import Path
-import yfinance as yf
 import pandas as pd
+from pathlib import Path
 from datetime import datetime, timedelta
+import yfinance as yf
 
+# Loads the past 20 years of the chosen products and saves them once. (update for newer data must be done manually!)
+def download_data(tickers=["^GDAXI", "^GSPC", "^HSI", "^STOXX50E", "EUNL.DE", "^SP500-35", "^SP500-40", "^SP500-45", "^YH103", "^YH206", "^YH311"]):
+    #index: ^GDAXI = DAX, ^GSPC = S&P500, ^HSI = Hang Seng, ^STOXX50E = Euro Stoxx 50
+    #EUNL.DE: iShares Core MSCI World UCITS ETF
+    #Financial Services: ^SP500-40, ^YH103
+    #HealthCare: ^SP500-35, ^YH206
+    #Information Technology: ^SP500-45, ^YH311
 
-# Loads the past 20years of the chosen products and saves them once. (update for newer data must be done manually!)
-def download_data(tickers=["^GDAXI", "^GSPC", "^HSI", "^STOXX50E", "EUNL.DE", "ACWI.MI"]): #^GDAXI = DAX, ^GSPC = S&P500, ^HSI = Hang Seng Index; e.g. ^NDX = Nasdaq100, STOXX50E = EuroStoxx50 etc.
+    Path("index_data").mkdir(parents=True, exist_ok=True)
+
     for ticker in tickers:
-        df = yf.download(
-            ticker,
-            period="20y",
-            interval="1d",
-            auto_adjust=True
-        )
+        try:
+            df = yf.download(ticker, period="20y", auto_adjust=False, progress=False)
+            if df is None or df.empty:
+                print(f"Warning: no data returned for {ticker}")
+                continue
 
-        # If no directory exists, create it
-        Path("index_data").mkdir(parents=True, exist_ok=True)
+            df = df[["Close"]].copy()
+            df.columns = ["index_value"]
+            df.index.name = "date"
+            df.to_parquet(f"index_data/{ticker}.parquet")
+            print(f"Downloaded {ticker}: {df.shape[0]} rows")
+        except Exception as error_message:
+            print(f"Error downloading {ticker}: {error_message}")
 
-        df = df[["Close"]]
 
-        df.to_parquet(f"index_data/{ticker}.parquet")
-
-        print(df.tail())
-
-#Updates the downloaded indices to the newest trading day (fills gap to old data)
+# Updates the downloaded indices to the newest trading day (fills gap to old data)
 def update_data(tickers=["^GDAXI", "^GSPC", "^HSI"]):
     for ticker in tickers:
         file_path = Path(f"index_data/{ticker}.parquet")
-
-        # If file doesn't exist → do full download
         if not file_path.exists():
             print(f"{ticker}: no data found → downloading 20y")
             download_data([ticker])
             continue
 
-        # Load existing data
-        old_df = pd.read_parquet(file_path)
-        old_df.index = pd.to_datetime(old_df.index)
+        try:
+            old_df = pd.read_parquet(file_path)
+            old_df.index = pd.to_datetime(old_df.index)
+            last_date = old_df.index.max()
+            start_date = last_date - timedelta(days=1)  # 1 Day because we need the closing data
+            end_date = datetime.today()
 
-        last_date = old_df.index.max()
+            if start_date >= end_date:
+                print(f"{ticker}: already up to date")
+                continue
 
-        # small overlap for safety (avoid missing corrections)
-        start_date = last_date - timedelta(days=1) #1Day because we need the closing data
-        end_date = datetime.today()
+            print(f"{ticker}: updating from {start_date.date()} to {end_date.date()}")
+            new_df = yf.download(
+                ticker,
+                start=start_date.strftime('%Y-%m-%d'),
+                end=end_date.strftime('%Y-%m-%d'),
+                auto_adjust=False,
+                progress=False,
+            )
 
-        if start_date >= end_date:
-            print(f"{ticker}: already up to date")
-            continue
+            if new_df is None or new_df.empty:
+                print(f"{ticker}: no new data")
+                continue
 
-        print(f"{ticker}: updating from {start_date.date()} to {end_date.date()}")
+            new_df = new_df[["Close"]].copy()
+            new_df.columns = ["index_value"]
+            new_df.index.name = "date"
 
-        # Download only missing data
-        new_df = yf.download(
-            ticker,
-            start=start_date.strftime('%Y-%m-%d'),
-            end=end_date.strftime('%Y-%m-%d'),
-            interval="1d",
-            auto_adjust=True
-        )
-
-        if new_df.empty:
-            print(f"{ticker}: no new data")
-            continue
-
-        new_df = new_df[["Close"]]
-
-        # Merge old + new
-        combined = pd.concat([old_df, new_df])
-        combined = combined[~combined.index.duplicated(keep="last")]
-
-        # Save as Parquet
-        combined.to_parquet(file_path)
-
-        print(f"{ticker}: update complete")
-        print(combined.tail())
+            combined = pd.concat([old_df, new_df])
+            combined = combined[~combined.index.duplicated(keep="last")]
+            combined.to_parquet(file_path)
+            print(f"{ticker}: update complete")
+        except Exception as error_message:
+            print(f"Error updating {ticker}: {error_message}")
