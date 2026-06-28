@@ -74,6 +74,45 @@ def prepare_investment_data(df_all_index):
             if not df_all_index["index_investpoint"].iloc[max(0, i-20):i].any():
                 df_all_index.loc[i, "index_investpoint"] = True
                 continue
+    
+    #Adding the types of market-situations
+
+    #[pre_crisis:] Der Entwicklung des Assets bringt regelmäßig 52-Wochen-Hochs hervor und steigt stetig an.
+    #[crisis:] Der Asset-Wert ist gefallen und liegt mind. 10\% unterhalb des 52-Wochen-Hochs.
+    #[post_crisis:] Der Asset-Wert hat sich nach einer Krise erholt und wird höher notiert als am Anfang der Krise.
+
+    for i in df_all_index[mask].index:
+        price = df_all_index.loc[i, "index_value"]
+        high = df_all_index.loc[i, "yearly_high"]
+
+        #pre_crisis: The development of the asset regularly produces 52-week highs and rises steadily.
+        if price == df_all_index["yearly_high"].iloc[max(0, i-20):i].any() or price > high * 0.95:
+            df_all_index.loc[i, "market_situation"] = "pre_crisis"
+            continue
+
+        #crisis: The asset value has fallen and is at least 10% below the 52-week high.
+        if price < high * 0.9:
+            df_all_index.loc[i, "market_situation"] = "crisis"
+            continue
+
+        #post_crisis: The asset value has recovered after a crisis and is higher than at the beginning of the crisis.
+        if price >= df_all_index["index_investpoint"].iloc[max(0, i-40):i].any(): #2 Months after Investmentpoint, the price should be higher than at the beginning of the crisis
+            df_all_index.loc[i, "market_situation"] = "post_crisis"
+            continue
+    
+    #avg line for market situation to clean up ping pong between 2 phases
+    for i in df_all_index[mask].index:
+        if df_all_index.loc[i, "market_situation"] == "pre_crisis":
+            if df_all_index.loc[max(0, i-20):i, "market_situation"].value_counts().get("crisis", 0) > 10:
+                df_all_index.loc[i, "market_situation"] = "crisis"
+                continue
+
+        if df_all_index.loc[i, "market_situation"] == "crisis":
+            if df_all_index.loc[max(0, i-20):i, "market_situation"].value_counts().get("pre_crisis", 0) > 10:
+                df_all_index.loc[i, "market_situation"] = "pre_crisis"
+                continue
+        
+
 
     return df_all_index, mask
 
