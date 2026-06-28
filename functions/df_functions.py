@@ -80,10 +80,10 @@ def prepare_investment_data(df_all_index):
         [
             (df_all_index["date"] >= "2007-08-09") & (df_all_index["date"] <= "2009-08-09"),
             (df_all_index["date"] >= "2010-01-01") & (df_all_index["date"] <= "2015-01-01"),
-            (df_all_index["date"] >= "2015-01-01") & (df_all_index["date"] <= "2017-01-01"),
+            (df_all_index["date"] >= "2015-05-01") & (df_all_index["date"] <= "2017-01-01"),
             (df_all_index["date"] >= "2020-01-01") & (df_all_index["date"] <= "2021-01-01"),
             (df_all_index["date"] >= "2022-02-14") & (df_all_index["date"] <= "2023-01-01"),
-            (df_all_index["date"] >= "2023-05-01") & (df_all_index["date"] <= "2024-01-01"),
+            (df_all_index["date"] >= "2023-03-01") & (df_all_index["date"] <= "2024-01-01"),
             (df_all_index["date"] >= "2025-03-01") & (df_all_index["date"] <= "2025-05-01"),
             (df_all_index["date"] >= "2026-02-28") & (df_all_index["date"] <= "2026-05-01"),
         ],

@@ -261,33 +261,47 @@ with top:
         )
     )
 
-    market_situation = alt.Chart(df_investment).mark_line().encode(
-        x="Date:T",
-        y="Date:T",
-        color=alt.Color(
-            "Period:N",
-            scale=alt.Scale(
-                domain=["Pre", "Crisis", "Post"],
-                range=["steelblue", "red", "green"]
-            )
-        )
-    )
-
-
     df = df_all_index.sort_values("date")
 
     df_bg = df[df["market_situation"].notna()].copy()
+    df_bg["period_id"] = (df_bg["market_situation"] != df_bg["market_situation"].shift()).cumsum()
+    df_periods = (
+        df_bg
+        .groupby(["period_id", "market_situation"], as_index=False)
+        .agg(start=("date", "first"), end=("date", "last"))
+    )
 
-    df_bg["start"] = df_bg["date"]
-    df_bg["end"] = df_bg["date"].shift(-1)
-
-
-    df_bg["end"] = df_bg["end"].fillna(df_bg["start"])
-
-    period_bg = alt.Chart(df_bg).mark_rect(opacity=0.15).encode(
+    period_bg = alt.Chart(df_periods).mark_rect(opacity=0.1).encode(
         x="start:T",
         x2="end:T",
-        color=alt.Color("market_situation:N")
+        y=alt.value(0),
+        y2=alt.value(400),
+        color=alt.Color(
+            "market_situation:N",
+            scale=alt.Scale(
+                domain=[
+                    "World Financial Crisis",
+                    "Eurocrisis",
+                    "Chinese Stock Market Turbulence",
+                    "Covid-19 Pandemic",
+                    "Ukraine War Kickoff",
+                    "Banking Crisis",
+                    "US Trade War",
+                    "Iran War"
+                ],
+                range=[
+                    "#23b172",
+                    "#ff000074",
+                    "#23b172",
+                    "#ff000074",
+                    "#23b172",
+                    "#ff000074",
+                    "#23b172",
+                    "#ff000074"
+                ]
+            ),
+            legend=None
+        )
     )
 
     #Combining Charts to be displayed as one
@@ -296,8 +310,9 @@ with top:
         left_axis_group,
         right_axis_group
     ).resolve_scale(
-        y="independent"
-    )
+        y="independent",
+        color="independent"
+    ).properties(height=420)
 
     st.altair_chart(combined_chart, width="stretch")
 
