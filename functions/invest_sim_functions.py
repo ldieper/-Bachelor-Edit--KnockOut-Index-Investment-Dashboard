@@ -213,6 +213,17 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
         df_table = df_investment[df_investment["closing_reason"] != 2][["inv_id", "active", "closing_reason", "starting_date", "closing_date", "profit", "current_value", "starting_investment"]].copy()
         df_table = df_table.groupby("inv_id").last().reset_index(drop=False)
         df_table = df_table.merge(barrier_growth[["inv_id", "annual_barrier_increase_pct"]], on="inv_id", how="left")
+
+        # Ensure `market_situation` exists on df_all_index to avoid KeyError
+        if "market_situation" not in df_all_index.columns:
+            df_all_index["market_situation"] = pd.NA
+
+        # Map starting market situation. Keep `starting_date` as datetime for mapping,
+        # then format it for display below.
+        df_table["starting_market_situation"] = pd.to_datetime(df_table["starting_date"]).map(
+            df_all_index.set_index("date")["market_situation"]
+        )
+
         df_table["starting_date"] = df_table["starting_date"].dt.strftime("%d.%m.%y")
         df_table["closing_date"] = pd.to_datetime(df_table["closing_date"], errors='coerce').dt.strftime("%d.%m.%y")
         df_table["current_value"] = df_table["current_value"].where(df_table["active"], 0)

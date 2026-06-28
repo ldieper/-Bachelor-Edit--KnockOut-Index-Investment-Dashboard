@@ -172,7 +172,6 @@ if df_simple_invest is not None and "date" in df_simple_invest.columns and not d
 else:
     df_plot_simple_invest = df_all_index[["date", "index_value"]].copy()
 
-
 #Dynamic Header (historic or up to date)
 last_trading_day = get_last_trading_day().date()
 df_last_day = get_last_investment_day(df_all_index).date()
@@ -262,8 +261,38 @@ with top:
         )
     )
 
+    market_situation = alt.Chart(df_investment).mark_line().encode(
+        x="Date:T",
+        y="Date:T",
+        color=alt.Color(
+            "Period:N",
+            scale=alt.Scale(
+                domain=["Pre", "Crisis", "Post"],
+                range=["steelblue", "red", "green"]
+            )
+        )
+    )
+
+
+    df = df_all_index.sort_values("date")
+
+    df_bg = df[df["market_situation"].notna()].copy()
+
+    df_bg["start"] = df_bg["date"]
+    df_bg["end"] = df_bg["date"].shift(-1)
+
+
+    df_bg["end"] = df_bg["end"].fillna(df_bg["start"])
+
+    period_bg = alt.Chart(df_bg).mark_rect(opacity=0.15).encode(
+        x="start:T",
+        x2="end:T",
+        color=alt.Color("market_situation:N")
+    )
+
     #Combining Charts to be displayed as one
     combined_chart = alt.layer(
+        period_bg,
         left_axis_group,
         right_axis_group
     ).resolve_scale(
@@ -520,7 +549,6 @@ with bottom:
 
             with col2:
                 starting_investment = round(selected_row_data['starting_investment'], 2)
-                st.metric("Start-Value", f"€ {starting_investment}")
 
             with col3:
                 if selected_row_data['active']:
@@ -532,9 +560,13 @@ with bottom:
                     st.metric("End", f" {closing_date}")
 
             with col4:
-                st.metric("Status", closing_reason_text)
+                start_regime = selected_row_data.get('Start regime') or selected_row_data.get('starting_market_situation')
+                st.metric("Start regime", f"{start_regime}")
 
             with col5:
+                st.metric("Status", closing_reason_text)
+
+            with col6:
                 profit_value = selected_row_data['profit']
                 st.metric("Profit", f"€ {profit_value:,.2f}".replace(",", " "))
 
