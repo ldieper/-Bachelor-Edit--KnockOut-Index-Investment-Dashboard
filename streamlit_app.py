@@ -40,6 +40,9 @@ if "all_results" not in st.session_state:
 if "selected_cost" not in st.session_state:
     st.session_state.selected_cost = 5
 
+if "selected_scope" not in st.session_state:
+    st.session_state.selected_scope = "Complete Timeline"
+
 
 
 
@@ -102,7 +105,7 @@ if selected_key not in st.session_state.all_results:
     st.stop()
 
 #Storing calculations in current
-current = st.session_state.all_results[selected_key]
+current = st.session_state.all_results[selected_key] ##########################################################
 
 
 #assigning current values for all indices and leverage
@@ -155,8 +158,10 @@ if df_simple_invest is None or (hasattr(df_simple_invest, 'empty') and df_simple
 # prepare a simple plot dataset for the simple investment section
 if df_simple_invest is not None and "date" in df_simple_invest.columns and not df_simple_invest.empty:
     df_simple_invest = df_simple_invest.copy()
+
     if "profit" not in df_simple_invest.columns:
         df_simple_invest["profit"] = df_simple_invest["total_value"] - df_simple_invest["total_invested"]
+
     if "roi_percent" not in df_simple_invest.columns:
         df_simple_invest["roi_percent"] = df_simple_invest.apply(
             lambda row: round((row["profit"] / row["total_invested"]) * 100, 2)
@@ -224,8 +229,50 @@ with top:
         legendY=10
     )
 
+    df = df_all_index.sort_values("date")
+
+    df_bg = df[df["market_situation"].notna()].copy()
+    df_bg["period_id"] = (df_bg["market_situation"] != df_bg["market_situation"].shift()).cumsum()
+    df_periods = (
+        df_bg
+        .groupby(["period_id", "market_situation"], as_index=False)
+        .agg(start=("date", "first"), end=("date", "last"))
+    )
+
+    df_inv = df_investment.copy()
+    df_inv["market_situation"] = None
+
+    for _, row in df_periods.iterrows():
+        mask = (
+            (df_inv["date"] >= row["start"]) &
+            (df_inv["date"] <= row["end"])
+        )
+
+        df_inv.loc[mask, "market_situation"] = row["market_situation"]
+
+
+    if st.session_state.selected_scope == "Complete Timeline":
+        df_plot = df_plot_filtered
+        df_inv = df_investment
+        df_periods_plot = df_periods
+
+    else:
+        df_plot = df_plot_filtered[
+            df_plot_filtered["market_situation"] == st.session_state.selected_scope
+        ]
+
+        df_inv = df_inv = df_inv[
+            df_inv["market_situation"].eq(st.session_state.selected_scope)
+        ].copy()
+        
+
+        df_periods_plot = df_periods[
+            df_periods["market_situation"] == st.session_state.selected_scope
+        ]
+
+
     #Base chart
-    base = alt.Chart(df_plot_filtered).encode(
+    base = alt.Chart(df_plot).encode(
         x=alt.X("date:T", title="Datum", axis=alt.Axis(format="%d %b %y"))
     )
 
@@ -246,10 +293,10 @@ with top:
     )
 
     #Group for the indipendent right axis
-    right_axis_group = alt.Chart(df_investment).transform_calculate(
+    right_axis_group = alt.Chart(df_inv).transform_calculate(
         lines="'Investment'"
     ).mark_line(size=2).encode(
-        x="date:T",
+        x="date:T", 
         y=alt.Y("cumulative_investment_value:Q", title="Investment Value (€)"),
         color=alt.Color(
             "lines:N",
@@ -261,17 +308,8 @@ with top:
         )
     )
 
-    df = df_all_index.sort_values("date")
 
-    df_bg = df[df["market_situation"].notna()].copy()
-    df_bg["period_id"] = (df_bg["market_situation"] != df_bg["market_situation"].shift()).cumsum()
-    df_periods = (
-        df_bg
-        .groupby(["period_id", "market_situation"], as_index=False)
-        .agg(start=("date", "first"), end=("date", "last"))
-    )
-
-    period_bg = alt.Chart(df_periods).mark_rect(opacity=0.1).encode(
+    period_bg = alt.Chart(df_periods_plot).mark_rect(opacity=0.1).encode(
         x="start:T",
         x2="end:T",
         y=alt.value(0),
@@ -291,13 +329,13 @@ with top:
                 ],
                 range=[
                     "#23b172",
-                    "#ff000074",
+                    "#ff0000ff",
                     "#23b172",
-                    "#ff000074",
+                    "#ff0000ff",
                     "#23b172",
-                    "#ff000074",
+                    "#ff0000ff",
                     "#23b172",
-                    "#ff000074"
+                    "#ff0000ff"
                 ]
             ),
             legend=None
@@ -388,10 +426,31 @@ with top:
                 #st.session_state.refresh_data = True
                 data_refresh()
 
-    if not summary_df.empty:
+    top_left, top_right = st.columns([0.2, 0.8])
+
+    with top_left:
         with st.container(border=True):
-            st.subheader("All combinations summary")
-            st.dataframe(summary_df, use_container_width=True)
+            st.subheader("Scope")
+
+            st.radio(
+                "Market Situation",
+                ["Complete Timeline",
+                 "World Financial Crisis",
+                 "Eurocrisis",
+                 "Chinese Stock Market Turbulence",
+                 "Covid-19 Pandemic",
+                 "Ukraine War Kickoff",
+                 "Banking Crisis",
+                 "US Trade War",
+                 "Iran War"],
+                key="selected_scope"
+            )
+
+    with top_right:
+        if not summary_df.empty:
+            with st.container(border=True):
+                st.subheader("All combinations summary")
+                st.dataframe(summary_df, width="stretch")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -475,7 +534,7 @@ with mid:
             with col3:
                 st.metric("ROI", f"{roi_percent:.2f} %", )
                 st.metric("Gesamtinvestition", f"€ {total_invested:,.2f}".replace(",", " "))
-    
+
         with st.container(border=True):
             st.subheader("Final simple investment summary")
             if df_simple_invest is not None and not df_simple_invest.empty:
@@ -484,7 +543,7 @@ with mid:
                     final_summary["date"] = pd.to_datetime(final_summary["date"]).dt.strftime("%Y-%m-%d")
                 st.dataframe(
                     final_summary[["total_invested", "total_value", "profit", "roi_percent"]],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True
                 )
             else:

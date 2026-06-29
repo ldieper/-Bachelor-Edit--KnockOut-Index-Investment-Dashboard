@@ -156,7 +156,7 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
             print(f"Skipping index {index_name} because the data file is empty or invalid.")
             continue
 
-        df_all_index, mask = prepare_investment_data(df_all_index)
+        df_all_index, mask = prepare_investment_data(df_all_index) 
 
         selected_budget = 500
         remaining_budget = selected_budget
