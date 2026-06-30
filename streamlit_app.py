@@ -56,7 +56,7 @@ if st.session_state.selected_index is not None:
         if missing_keys: #Data from DB is not complete/empty -> New Data needs to be calculated
             with st.spinner("Precomputing.. " + get_random_phrase()):
                 annual_cost = st.session_state.selected_cost / 100
-                new_results = precompute_all_simulations(keys_to_compute=missing_keys, annual_cost=annual_cost) #if db was empty: missing keys = all available keys
+                new_results = precompute_all_simulations(keys_to_compute=missing_keys, annual_cost=annual_cost, scope="st.session_state.selected_scope") #if db was empty: missing keys = all available keys
                 store_to_db(new_results)
                 st.session_state.all_results.update(new_results)
                 st.cache_data.clear()
@@ -114,30 +114,65 @@ df_investment = current["df_investment"]
 df_plot_filtered = current["df_plot_filtered"]
 remaining_budget = current["remaining_budget"]
 cumulative_value = current["cumulative_value"]
-metrics = current["metrics"]
+
+# Get metrics for the selected scope
+all_scope_metrics = current["metrics"]
+metrics = all_scope_metrics.get(st.session_state.selected_scope, {})
 
 # build summary table for all loaded combinations
 summary_rows = []
 for (index_name, leverage), result in st.session_state.all_results.items():
-    result_metrics = result.get("metrics", {})
+    # Use "Complete Timeline" metrics for the summary table
+    result_all_scope_metrics = result.get("metrics", {})
+    result_metrics = result_all_scope_metrics.get("Complete Timeline", {})
     df_table = result.get("df_table")
     avg_barrier_increase = None
     if df_table is not None and not df_table.empty and "annual_barrier_increase_pct" in df_table.columns:
         avg_barrier_increase = round(df_table["annual_barrier_increase_pct"].dropna().mean(), 2)
 
     summary_rows.append({
+        # ---------------------------
+        # Meta
+        # ---------------------------
         "Index": index_name,
         "Leverage": leverage,
         "Average Barrier Increase %": avg_barrier_increase,
-        "Cumulative Value": result.get("cumulative_value"),
-        "Final Profit": result_metrics.get("final_profit"),
+
+        # ---------------------------
+        # Portfolio
+        # ---------------------------
+        "Start Value": result_metrics.get("start_investment_level"),
+        "End Value": result_metrics.get("end_investment_level"),
+
+        # (optional but recommended: remove if redundant)
+        # "Cumulative Value": result.get("cumulative_value"),
+
+        # ---------------------------
+        # Performance
+        # ---------------------------
+        "Total Profit": result_metrics.get("total_profit"),
         "ROI %": result_metrics.get("total_return"),
+
+        "Max Drawdown %": result_metrics.get("max_drawdown"),
+        "Sharpe Ratio": result_metrics.get("sharpe_ratio"),
+        "Sortino Ratio": result_metrics.get("sortino_ratio"),
+
+        # ---------------------------
+        # Trades
+        # ---------------------------
         "Trades": result_metrics.get("trades_count"),
-        "Knockouts": result_metrics.get("knockouts_count"),
+        "Closed Trades": result_metrics.get("closed_trades"),
+        "Active Trades": result_metrics.get("active_trades"),
+
         "Sells": result_metrics.get("sells_count"),
-        "Active": result_metrics.get("active_trades"),
-        "Losses": result_metrics.get("loss_sum"),
+        "Knockouts": result_metrics.get("knockouts_count"),
+        "Not Enough Money": result_metrics.get("not_enough_money_count"),
+
+        # ---------------------------
+        # Capital Efficiency
+        # ---------------------------
         "Total Invested": result_metrics.get("total_invested_sum"),
+        "Losses": result_metrics.get("loss_sum"),
     })
 
 summary_df = pd.DataFrame(summary_rows)
@@ -366,27 +401,115 @@ with top:
 
             col1, col2, col3, col4, col5 = st.columns(5)
 
+            # ---------------------------
+            # Derived portfolio changes
+            # ---------------------------
+            investment_change = metrics["end_investment_level"] - metrics["start_investment_level"]
+
+            investment_change_pct = (
+                investment_change / metrics["start_investment_level"] * 100
+                if metrics["start_investment_level"] > 0
+                else 0
+            )
+
+            # ---------------------------
+            # PRE-CALCULATIONS
+            # ---------------------------
+            investment_change = metrics["end_investment_level"] - metrics["start_investment_level"]
+
+            investment_change_pct = (
+                investment_change / metrics["start_investment_level"] * 100
+                if metrics["start_investment_level"]
+                else 0
+            )
+
+            roi = metrics.get("total_return")
+            trades = metrics.get("trades_count") or 0
+
+
+            # ---------------------------
+            # COL 1 – Portfolio Value
+            # ---------------------------
             with col1:
-                st.metric("Investment-Level", f"€ {round(cumulative_value, 2):,.2f}".replace(",", " "))
-                current_index_value = float(df_all_index["index_value"].iloc[-1])
-                st.metric("Index-Level", f"{current_index_value:,.3f}".replace(",", " "))
+                st.metric(
+                    "Portfolio Value (End)",
+                    f"€ {metrics['end_investment_level']:,.2f}".replace(",", " "),
+                    f"{investment_change_pct:+.2f} % vs start"
+                )
 
+                st.metric(
+                    "Index Level",
+                    f"{float(df_all_index['index_value'].iloc[-1]):,.3f}".replace(",", " ")
+                )
+
+
+            # ---------------------------
+            # COL 2 – Performance
+            # ---------------------------
             with col2:
-                st.metric("Profit", f"€ {metrics['final_profit']:,.2f}".replace(",", " "))
-                st.metric("Sells (Leverage < 1.5x)", f"{metrics['sells_count']}", f"{round( (metrics['sells_count'] / metrics['trades_count'] if not 0 else 1) * 100, 2 )} % of total", delta_arrow="off")
+                st.metric(
+                    "Profit",
+                    f"€ {metrics['total_profit']:,.2f}".replace(",", " ")
+                )
 
+                st.metric(
+                    "ROI",
+                    f"{roi} %" if roi is not None else "N/A"
+                )
+
+
+            # ---------------------------
+            # COL 3 – Risk
+            # ---------------------------
             with col3:
-                st.metric("Losses", f"€ {metrics['loss_sum']:,.2f}".replace(",", " "))
-                st.metric("KnockOuts", f"{metrics['knockouts_count']}", f"{round( (metrics['knockouts_count'] / metrics['trades_count'] if not 0 else 1) * 100, 2 )} % of total", delta_color="inverse", delta_arrow="off")
+                st.metric(
+                    "Max Drawdown",
+                    f"{metrics.get('max_drawdown')} %"
+                    if metrics.get("max_drawdown") is not None else "N/A"
+                )
 
+                st.metric(
+                    "Sharpe Ratio",
+                    f"{metrics.get('sharpe_ratio')}"
+                    if metrics.get("sharpe_ratio") is not None else "N/A"
+                )
+
+
+            # ---------------------------
+            # COL 4 – Trade Breakdown
+            # ---------------------------
             with col4:
-                st.metric("ROI", f"{metrics['total_return']} %", )
-                st.metric("Active investments", f"{metrics['active_trades']}", f"{round( (metrics['active_trades'] / metrics['trades_count'] if not 0 else 1) * 100, 2 )} % of total" , delta_arrow="off")
+                st.metric(
+                    "Trades",
+                    f"{trades}"
+                )
 
+                st.metric(
+                    "Knockouts",
+                    f"{metrics['knockouts_count']}",
+                    f"{round(metrics['knockouts_count'] / trades * 100 if trades else 0, 2)} %"
+                )
+
+                st.metric(
+                    "Sells",
+                    f"{metrics['sells_count']}"
+                )
+
+
+            # ---------------------------
+            # COL 5 – Capital Efficiency
+            # ---------------------------
             with col5:
-                st.metric("Accessible budget", f"€ {remaining_budget:,.2f}".replace(",", " "))
-                st.metric("Monthly budget", f"€ 500,00")
+                st.metric(
+                    "Invested Capital",
+                    f"€ {metrics['total_invested_sum']:,.2f}".replace(",", " ")
+                )
 
+                st.metric(
+                    "Active Positions",
+                    f"{metrics['active_trades']}",
+                    f"{round(metrics['active_trades'] / trades * 100 if trades else 0, 2)} %"
+                )
 
     #Settings for Dashboard
     with top_right:

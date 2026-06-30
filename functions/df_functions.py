@@ -103,39 +103,157 @@ def prepare_investment_data(df_all_index):
     return df_all_index, mask
 
 #Calculating metrics and returning them as one
-def calculate_metrics(df_investment):
-    final_trades = df_investment.groupby("inv_id").last()
+def calculate_metrics(df_investment, scope="Complete Timeline"):
 
+    df_full = df_investment.sort_values("date")
+
+    if df_full.empty:
+        return {}
+
+    # ----------------------------
+    # Scope filtering
+    # ----------------------------
+    if scope != "Complete Timeline":
+        df_trades = df_full[df_full["market_situation"] == scope]
+    else:
+        df_trades = df_full
+
+    if df_trades.empty:
+        df_trades = df_full
+
+    final_trades = df_trades.groupby("inv_id").last()
+
+    # ==================================================
+    # 1. EQUITY CURVE (ONLY PLACE WHERE START/END MAKES SENSE)
+    # ==================================================
+    equity = df_trades["cumulative_investment_value"]
+
+    start_investment_level = round(equity.iloc[0], 2) if not equity.empty else None
+    end_investment_level = round(equity.iloc[-1], 2) if not equity.empty else None
+
+    # ==================================================
+    # 2. PROFIT (snapshot-based, not time-based)
+    # ==================================================
+    total_profit = round(final_trades["profit"].sum(), 2)
+
+    # ==================================================
+    # 3. INVESTED CAPITAL
+    # ==================================================
+    total_invested_sum = round(
+        final_trades.loc[
+            final_trades["closing_reason"] != 2,
+            "starting_investment"
+        ].sum(),
+        2
+    )
+
+    loss_sum = round(
+        final_trades.loc[
+            final_trades["closing_reason"] == 0,
+            "starting_investment"
+        ].sum(),
+        2
+    )
+
+    total_return = (
+        round(total_profit / total_invested_sum * 100, 2)
+        if total_invested_sum > 0
+        else None
+    )
+
+    # ==================================================
+    # 4. TRADE STATISTICS (NO START/END HERE!)
+    # ==================================================
     active_trades = final_trades["active"].sum()
-
     closed_trades = (~final_trades["active"]).sum()
+
     sells_count = (final_trades["closing_reason"] == 1).sum()
     knockouts_count = (final_trades["closing_reason"] == 0).sum()
+    not_enough_money_count = (final_trades["closing_reason"] == 2).sum()
 
     trades_count = (final_trades["closing_reason"] != 2).sum()
-    knockouts_count = (final_trades["closing_reason"] == 0).sum()
-    sells_count = (final_trades["closing_reason"] == 1).sum()
-    not_enough_money_count = (final_trades["closing_reason"] == 2).sum()
-    active_trades = final_trades["active"].sum()
 
-    final_profit = round(final_trades["profit"].sum(), 2)
-    loss_sum = round(final_trades.loc[final_trades["closing_reason"] == 0, "starting_investment"].sum(), 2)
-    total_invested_sum = round(final_trades.loc[final_trades["closing_reason"] != 2, "starting_investment"].sum(), 2)
+    # ==================================================
+    # 5. DRAWDOWN
+    # ==================================================
+    running_max = equity.cummax()
+    drawdown = (equity - running_max) / running_max
 
-    total_return = round(final_profit / total_invested_sum * 100, 2) if total_invested_sum > 0 else 0
+    max_drawdown = (
+        round(drawdown.min() * 100, 2)
+        if not drawdown.empty
+        else None
+    )
 
-    
+    # ==================================================
+    # 6. SHARPE / SORTINO
+    # ==================================================
+    returns = equity.pct_change().dropna()
 
+    if len(returns) > 1 and returns.std() != 0:
+        sharpe_ratio = round(
+            (returns.mean() / returns.std()) * np.sqrt(252),
+            2
+        )
+    else:
+        sharpe_ratio = None
+
+    negative_returns = returns[returns < 0]
+
+    if len(negative_returns) > 1 and negative_returns.std() != 0:
+        sortino_ratio = round(
+            (returns.mean() / negative_returns.std()) * np.sqrt(252),
+            2
+        )
+    else:
+        sortino_ratio = None
+
+    # ==================================================
+    # 7. RETURN CLEAN STRUCTURE
+    # ==================================================
     return {
+        "start_investment_level": start_investment_level,
+        "end_investment_level": end_investment_level,
+
+        "total_profit": total_profit,
+        "total_return": total_return,
+
+        "loss_sum": loss_sum,
+        "total_invested_sum": total_invested_sum,
+
+        "trades_count": trades_count,
+        "active_trades": active_trades,
         "closed_trades": closed_trades,
         "sells_count": sells_count,
         "knockouts_count": knockouts_count,
         "not_enough_money_count": not_enough_money_count,
-        "final_profit": final_profit,
-        "trades_count": trades_count,
-        "active_trades": active_trades,
-        "loss_sum": loss_sum,
-        "total_invested_sum": total_invested_sum,
-        "total_return": total_return,
+
+        "max_drawdown": max_drawdown,
+        "sharpe_ratio": sharpe_ratio,
+        "sortino_ratio": sortino_ratio,
     }
+
+# Precompute metrics for all scopes
+def calculate_all_scope_metrics(df_investment):
+    """
+    Precomputes metrics for all available scopes and returns a dictionary.
+    This is called once during simulation precomputation and stored in results.
+    """
+    scopes = [
+        "Complete Timeline",
+        "World Financial Crisis",
+        "Eurocrisis",
+        "Chinese Stock Market Turbulence",
+        "Covid-19 Pandemic",
+        "Ukraine War Kickoff",
+        "Banking Crisis",
+        "US Trade War",
+        "Iran War"
+    ]
+    
+    scope_metrics = {}
+    for scope in scopes:
+        scope_metrics[scope] = calculate_metrics(df_investment, scope=scope)
+    
+    return scope_metrics
 

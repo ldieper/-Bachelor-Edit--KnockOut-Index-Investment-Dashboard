@@ -132,7 +132,7 @@ def run_simulation(source, filter, selected_leverage, selected_budget, remaining
     return remaining_budget, df_investment
 
 #Running simulation for all possible indices and leverage options
-def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_leverages=None, annual_cost=0.05): #debug_index="GDAXI", debug_leverages=3
+def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_leverages=None, annual_cost=0.05, scope="Complete Timeline"): #debug_index="GDAXI", debug_leverages=3
     index_map = get_index_map()
 
     #Debug mode for especially returning specific inndex and leverage (also good for faster loaing times while fixing other bugs)
@@ -177,8 +177,15 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
             annual_dividend_yield=0.01, #1% dividend per Share
             allow_fractional=True)
 
-        # Calculate metrics
-        metrics = calculate_metrics(df_investment)
+        # Add market_situation to df_investment by merging with df_all_index
+        df_investment = df_investment.merge(
+            df_all_index[["date", "market_situation"]],
+            on="date",
+            how="left"
+        )
+
+        # Calculate metrics for all scopes
+        scope_metrics = calculate_all_scope_metrics(df_investment)
 
         df_investment_plot = df_investment[["date", "current_value", "inv_id", "knockout_barrier", "leverage", "profit", "cumulative_investment_value", "starting_date", "closing_date"]].drop_duplicates(subset=["date", "inv_id"], keep="last")
         
@@ -239,7 +246,7 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
             "df_table": df_table,
             "remaining_budget": remaining_budget,  
             "cumulative_value": cumulative_value,
-            "metrics": metrics,
+            "metrics": scope_metrics,
             "df_plot_filtered": df_plot_filtered,
             "knockout_barriers": barrier_growth,
             "df_simple_invest": df_simple_invest

@@ -79,12 +79,27 @@ def filter_nearest_barriers(df_plot, top_n=1):
     if "knockout_barrier" not in df_plot.columns or df_plot["knockout_barrier"].isna().all():
         return df_plot
     
+    # Keep all rows first
+    df_result = df_plot.copy()
+    
+    # Only filter barriers, not index values
+    df_with_barriers = df_plot[df_plot["knockout_barrier"].notna()].copy()
+    
+    if df_with_barriers.empty:
+        return df_result
+    
     # Calculate absolute distance from index to barrier
-    abs_dist = (df_plot["index_value"] - df_plot["knockout_barrier"]).abs()
+    abs_dist = (df_with_barriers["index_value"] - df_with_barriers["knockout_barrier"]).abs()
     
-    # Rank by distance within each date group, keep only top N (defaut = 2)
-    rank = df_plot.groupby("date").cumcount()
-    df_plot_temp = df_plot.assign(abs_dist=abs_dist, rank=rank)
-    df_plot_temp["rank"] = df_plot_temp.groupby("date")["abs_dist"].rank(method="first")
+    # Rank by distance within each date group, keep only top N (default = 1)
+    df_with_barriers_temp = df_with_barriers.assign(abs_dist=abs_dist)
+    df_with_barriers_temp["rank"] = df_with_barriers_temp.groupby("date")["abs_dist"].rank(method="first")
     
-    return df_plot_temp[df_plot_temp["rank"] <= top_n].drop(columns=["abs_dist", "rank"])
+    # Keep only top N barriers per date
+    df_barriers_filtered = df_with_barriers_temp[df_with_barriers_temp["rank"] <= top_n].drop(columns=["abs_dist", "rank"])
+    
+    # Set barriers to NaN for rows not in the filtered set
+    df_result.loc[~df_result.index.isin(df_barriers_filtered.index), "knockout_barrier"] = None
+    df_result.loc[df_barriers_filtered.index, "knockout_barrier"] = df_barriers_filtered["knockout_barrier"]
+    
+    return df_result
