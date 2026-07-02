@@ -179,24 +179,33 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
 
         "start_investment_level": start_investment_level,
         "end_investment_level": end_investment_level,
+
         "start_total_profit": start_total_profit,
         "end_total_profit": end_total_profit,
+
         "start_total_invested_sum": start_total_invested_sum,
         "end_total_invested_sum": end_total_invested_sum,
+
         "start_loss_sum": start_loss_sum,
-        "start_total_return": start_total_return,
         "end_loss_sum": end_loss_sum,
+        
         "end_total_return": end_total_return,
+        "start_total_return": start_total_return,
+        
         "start_active_trades": start_active_trades,
-        "start_closed_trades": start_closed_trades,
         "end_active_trades": end_active_trades,
+
+        "start_closed_trades": start_closed_trades,
         "end_closed_trades": end_closed_trades,
+
         "start_sells_count": start_sells_count,
-        "start_knockouts_count": start_knockouts_count,
-        "start_trades_count": start_trades_count,
         "end_sells_count": end_sells_count,
+
+        "start_knockouts_count": start_knockouts_count,
         "end_knockouts_count": end_knockouts_count,
+
         "end_trades_count": end_trades_count,
+        "start_trades_count": start_trades_count,
     }
 
 # Precompute metrics for all scopes

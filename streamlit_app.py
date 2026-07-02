@@ -83,8 +83,8 @@ def data_refresh():
     if missing_keys:
         with st.spinner("Updating data.. "):
             annual_cost = st.session_state.selected_cost / 100
-            new_results = precompute_all_simulations(keys_to_compute=missing_keys, debug_index=None, debug_leverages=None, annual_cost=annual_cost)
-            st.session_state.all_results.update(new_results)
+            new_results = precompute_all_simulations(keys_to_compute=missing_keys, annual_cost=annual_cost)
+            st.session_state.all_results.update(new_results)    
             st.cache_data.clear()
 
     #st.session_state.refresh_data = False #Deactivating button to be cklickable again
@@ -105,7 +105,7 @@ if selected_key not in st.session_state.all_results:
     st.stop()
 
 #Storing calculations in current
-current = st.session_state.all_results[selected_key] ##########################################################
+current = st.session_state.all_results[selected_key] 
 
 
 #assigning current values for all indices and leverage
