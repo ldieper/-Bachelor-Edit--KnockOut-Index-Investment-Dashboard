@@ -121,58 +121,58 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
 
     final_trades = df_trades.groupby("inv_id").last()
 
+    crisis_start = (
+        df_full.loc[
+            df_full["market_situation"] == scope,
+            "date"
+        ].min()
+    )
+
+    crisis_end = (
+        df_full.loc[
+            df_full["market_situation"] == scope,
+            "date"
+        ].max()
+    )
+
 
     equity = df_trades["cumulative_investment_value"]
 
-    start_investment_level = round(equity.iloc[0], 2) if not equity.empty else None
-    end_investment_level = round(equity.iloc[-1], 2) if not equity.empty else None
+    start_investment_level = round(df_trades.loc[df_trades["date"] == crisis_start, "cumulative_investment_value"].iloc[0], 2)
+    end_investment_level = round(df_trades.loc[df_trades["date"] == crisis_end, "cumulative_investment_value"].iloc[0], 2)
 
+    start_total_profit = round(final_trades.loc[final_trades["date"] == crisis_start, "profit"].sum(), 2)
+    end_total_profit = round(final_trades.loc[final_trades["date"] == crisis_end, "profit"].sum(), 2)
 
-    start_total_profit = round(final_trades["profit"].sum(), 2) if not final_trades.empty else None
-    end_total_profit = round(final_trades["profit"].sum(), 2) if not final_trades.empty else None
+    start_total_invested_sum = round(final_trades.loc[(final_trades["date"] == crisis_start) & (final_trades["closing_reason"] != 2), "starting_investment"].sum(), 2)
+    start_loss_sum = round(final_trades.loc[(final_trades["date"] == crisis_start) & (final_trades["closing_reason"] == 0), "starting_investment"].sum(), 2)
+    start_total_return = round(start_total_profit / start_total_invested_sum * 100, 2) if start_total_invested_sum > 0 else None
 
+    end_total_invested_sum = round(final_trades.loc[(final_trades["date"] == crisis_end) & (final_trades["closing_reason"] != 2), "starting_investment"].sum(), 2)
+    end_loss_sum = round(final_trades.loc[(final_trades["date"] == crisis_end) & (final_trades["closing_reason"] == 0), "starting_investment"].sum(), 2)
+    end_total_return = round(end_total_profit / end_total_invested_sum * 100, 2) if end_total_invested_sum > 0 else None
 
-    start_total_invested_sum = round(final_trades.loc[final_trades["closing_reason"] != 2, "starting_investment"].sum(), 2)
-    start_loss_sum = round(final_trades.loc[final_trades["closing_reason"] == 0, "starting_investment"].sum(), 2)
-    start_total_return = (round(start_total_profit / start_total_invested_sum * 100, 2) if start_total_invested_sum > 0 else None)
+    start_active_trades = int(final_trades.loc[final_trades["date"] == crisis_start, "active"].sum())
+    start_closed_trades = int((~final_trades.loc[final_trades["date"] == crisis_start, "active"]).sum())
 
-    end_total_invested_sum = round(final_trades.loc[final_trades["closing_reason"] != 2, "starting_investment"].sum(), 2)
-    end_loss_sum = round(final_trades.loc[final_trades["closing_reason"] == 0, "starting_investment"].sum(), 2)
-    end_total_return = (round(end_total_profit / end_total_invested_sum * 100, 2) if end_total_invested_sum > 0 else None)
+    end_active_trades = int(final_trades.loc[final_trades["date"] == crisis_end, "active"].sum())
+    end_closed_trades = int((~final_trades.loc[final_trades["date"] == crisis_end, "active"]).sum())
 
+    start_sells_count = int(((final_trades["date"] == crisis_start) & (final_trades["closing_reason"] == 1)).sum())
+    start_knockouts_count = int(((final_trades["date"] == crisis_start) & (final_trades["closing_reason"] == 0)).sum())
+    start_trades_count = int(((final_trades["date"] == crisis_start) & (final_trades["closing_reason"] != 2)).sum())
 
-    start_active_trades = int(final_trades["active"].sum())
-    start_closed_trades = int((~final_trades["active"]).sum())
-    
-    end_active_trades = int(final_trades["active"].sum())
-    end_closed_trades = int((~final_trades["active"]).sum())
-
-
-    start_sells_count = int((final_trades["closing_reason"] == 1).sum())
-    start_knockouts_count = int((final_trades["closing_reason"] == 0).sum())
-    start_trades_count = int((final_trades["closing_reason"] != 2).sum())
-
-    end_sells_count = int((final_trades["closing_reason"] == 1).sum())
-    end_knockouts_count = int((final_trades["closing_reason"] == 0).sum())
-    end_trades_count = int((final_trades["closing_reason"] != 2).sum())
+    end_sells_count = int(((final_trades["date"] == crisis_end) & (final_trades["closing_reason"] == 1)).sum())
+    end_knockouts_count = int(((final_trades["date"] == crisis_end) & (final_trades["closing_reason"] == 0)).sum())
+    end_trades_count = int(((final_trades["date"] == crisis_end) & (final_trades["closing_reason"] != 2)).sum())
 
 
     running_max = equity.cummax()
     drawdown = (equity - running_max) / running_max
 
     max_drawdown = (
-        round(drawdown.min() * 100, 2) if not drawdown.empty else None
-    )
+        round(drawdown.min() * 100, 2) if not drawdown.empty else None)
 
-
-    returns = equity.pct_change().dropna()
-    if len(returns) > 1 and returns.std() != 0: sharpe_ratio = round((returns.mean() / returns.std()) * np.sqrt(252), 2)
-    else: sharpe_ratio = None
-    
-    negative_returns = returns[returns < 0]
-
-    if len(negative_returns) > 1 and negative_returns.std() != 0: sortino_ratio = round((returns.mean() / negative_returns.std()) * np.sqrt(252), 2) 
-    else: sortino_ratio = None
 
     return {
         "max_drawdown": max_drawdown,
@@ -188,7 +188,7 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
 
         "start_loss_sum": start_loss_sum,
         "end_loss_sum": end_loss_sum,
-        
+
         "end_total_return": end_total_return,
         "start_total_return": start_total_return,
         
