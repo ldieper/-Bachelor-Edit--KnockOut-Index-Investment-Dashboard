@@ -110,9 +110,7 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
     if df_full.empty:
         return {}
 
-    # ----------------------------
-    # Scope filtering
-    # ----------------------------
+
     if scope != "Complete Timeline":
         df_trades = df_full[df_full["market_situation"] == scope]
     else:
@@ -123,114 +121,82 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
 
     final_trades = df_trades.groupby("inv_id").last()
 
-    # ==================================================
-    # 1. EQUITY CURVE (ONLY PLACE WHERE START/END MAKES SENSE)
-    # ==================================================
+
     equity = df_trades["cumulative_investment_value"]
 
     start_investment_level = round(equity.iloc[0], 2) if not equity.empty else None
     end_investment_level = round(equity.iloc[-1], 2) if not equity.empty else None
 
-    # ==================================================
-    # 2. PROFIT (snapshot-based, not time-based)
-    # ==================================================
-    total_profit = round(final_trades["profit"].sum(), 2)
 
-    # ==================================================
-    # 3. INVESTED CAPITAL
-    # ==================================================
-    total_invested_sum = round(
-        final_trades.loc[
-            final_trades["closing_reason"] != 2,
-            "starting_investment"
-        ].sum(),
-        2
-    )
+    start_total_profit = round(final_trades["profit"].sum(), 2) if not final_trades.empty else None
+    end_total_profit = round(final_trades["profit"].sum(), 2) if not final_trades.empty else None
 
-    loss_sum = round(
-        final_trades.loc[
-            final_trades["closing_reason"] == 0,
-            "starting_investment"
-        ].sum(),
-        2
-    )
 
-    total_return = (
-        round(total_profit / total_invested_sum * 100, 2)
-        if total_invested_sum > 0
-        else None
-    )
+    start_total_invested_sum = round(final_trades.loc[final_trades["closing_reason"] != 2, "starting_investment"].sum(), 2)
+    start_loss_sum = round(final_trades.loc[final_trades["closing_reason"] == 0, "starting_investment"].sum(), 2)
+    start_total_return = (round(start_total_profit / start_total_invested_sum * 100, 2) if start_total_invested_sum > 0 else None)
 
-    # ==================================================
-    # 4. TRADE STATISTICS (NO START/END HERE!)
-    # ==================================================
-    active_trades = final_trades["active"].sum()
-    closed_trades = (~final_trades["active"]).sum()
+    end_total_invested_sum = round(final_trades.loc[final_trades["closing_reason"] != 2, "starting_investment"].sum(), 2)
+    end_loss_sum = round(final_trades.loc[final_trades["closing_reason"] == 0, "starting_investment"].sum(), 2)
+    end_total_return = (round(end_total_profit / end_total_invested_sum * 100, 2) if end_total_invested_sum > 0 else None)
 
-    sells_count = (final_trades["closing_reason"] == 1).sum()
-    knockouts_count = (final_trades["closing_reason"] == 0).sum()
-    not_enough_money_count = (final_trades["closing_reason"] == 2).sum()
 
-    trades_count = (final_trades["closing_reason"] != 2).sum()
+    start_active_trades = int(final_trades["active"].sum())
+    start_closed_trades = int((~final_trades["active"]).sum())
+    
+    end_active_trades = int(final_trades["active"].sum())
+    end_closed_trades = int((~final_trades["active"]).sum())
 
-    # ==================================================
-    # 5. DRAWDOWN
-    # ==================================================
+
+    start_sells_count = int((final_trades["closing_reason"] == 1).sum())
+    start_knockouts_count = int((final_trades["closing_reason"] == 0).sum())
+    start_trades_count = int((final_trades["closing_reason"] != 2).sum())
+
+    end_sells_count = int((final_trades["closing_reason"] == 1).sum())
+    end_knockouts_count = int((final_trades["closing_reason"] == 0).sum())
+    end_trades_count = int((final_trades["closing_reason"] != 2).sum())
+
+
     running_max = equity.cummax()
     drawdown = (equity - running_max) / running_max
 
     max_drawdown = (
-        round(drawdown.min() * 100, 2)
-        if not drawdown.empty
-        else None
+        round(drawdown.min() * 100, 2) if not drawdown.empty else None
     )
 
-    # ==================================================
-    # 6. SHARPE / SORTINO
-    # ==================================================
+
     returns = equity.pct_change().dropna()
-
-    if len(returns) > 1 and returns.std() != 0:
-        sharpe_ratio = round(
-            (returns.mean() / returns.std()) * np.sqrt(252),
-            2
-        )
-    else:
-        sharpe_ratio = None
-
+    if len(returns) > 1 and returns.std() != 0: sharpe_ratio = round((returns.mean() / returns.std()) * np.sqrt(252), 2)
+    else: sharpe_ratio = None
+    
     negative_returns = returns[returns < 0]
 
-    if len(negative_returns) > 1 and negative_returns.std() != 0:
-        sortino_ratio = round(
-            (returns.mean() / negative_returns.std()) * np.sqrt(252),
-            2
-        )
-    else:
-        sortino_ratio = None
+    if len(negative_returns) > 1 and negative_returns.std() != 0: sortino_ratio = round((returns.mean() / negative_returns.std()) * np.sqrt(252), 2) 
+    else: sortino_ratio = None
 
-    # ==================================================
-    # 7. RETURN CLEAN STRUCTURE
-    # ==================================================
     return {
+        "max_drawdown": max_drawdown,
+
         "start_investment_level": start_investment_level,
         "end_investment_level": end_investment_level,
-
-        "total_profit": total_profit,
-        "total_return": total_return,
-
-        "loss_sum": loss_sum,
-        "total_invested_sum": total_invested_sum,
-
-        "trades_count": trades_count,
-        "active_trades": active_trades,
-        "closed_trades": closed_trades,
-        "sells_count": sells_count,
-        "knockouts_count": knockouts_count,
-        "not_enough_money_count": not_enough_money_count,
-
-        "max_drawdown": max_drawdown,
-        "sharpe_ratio": sharpe_ratio,
-        "sortino_ratio": sortino_ratio,
+        "start_total_profit": start_total_profit,
+        "end_total_profit": end_total_profit,
+        "start_total_invested_sum": start_total_invested_sum,
+        "end_total_invested_sum": end_total_invested_sum,
+        "start_loss_sum": start_loss_sum,
+        "start_total_return": start_total_return,
+        "end_loss_sum": end_loss_sum,
+        "end_total_return": end_total_return,
+        "start_active_trades": start_active_trades,
+        "start_closed_trades": start_closed_trades,
+        "end_active_trades": end_active_trades,
+        "end_closed_trades": end_closed_trades,
+        "start_sells_count": start_sells_count,
+        "start_knockouts_count": start_knockouts_count,
+        "start_trades_count": start_trades_count,
+        "end_sells_count": end_sells_count,
+        "end_knockouts_count": end_knockouts_count,
+        "end_trades_count": end_trades_count,
     }
 
 # Precompute metrics for all scopes

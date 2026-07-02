@@ -219,6 +219,7 @@ def precompute_all_simulations(keys_to_compute=None, debug_index=None, debug_lev
 
         df_table = df_investment[df_investment["closing_reason"] != 2][["inv_id", "active", "closing_reason", "starting_date", "closing_date", "profit", "current_value", "starting_investment"]].copy()
         df_table = df_table.groupby("inv_id").last().reset_index(drop=False)
+        df_table["start_investment"] = df_table["starting_investment"]
         df_table = df_table.merge(barrier_growth[["inv_id", "annual_barrier_increase_pct"]], on="inv_id", how="left")
 
         # Ensure `market_situation` exists on df_all_index to avoid KeyError

@@ -121,63 +121,60 @@ metrics = all_scope_metrics.get(st.session_state.selected_scope, {})
 
 # build summary table for all loaded combinations
 summary_rows = []
+
 for (index_name, leverage), result in st.session_state.all_results.items():
-    # Use "Complete Timeline" metrics for the summary table
+
     result_all_scope_metrics = result.get("metrics", {})
-    result_metrics = result_all_scope_metrics.get("Complete Timeline", {})
+
+    result_metrics = result_all_scope_metrics.get(
+        st.session_state.selected_scope,
+        {}
+    )
+
     df_table = result.get("df_table")
     avg_barrier_increase = None
     if df_table is not None and not df_table.empty and "annual_barrier_increase_pct" in df_table.columns:
         avg_barrier_increase = round(df_table["annual_barrier_increase_pct"].dropna().mean(), 2)
 
+
+
     summary_rows.append({
-        # ---------------------------
-        # Meta
-        # ---------------------------
+     
         "Index": index_name,
         "Leverage": leverage,
         "Average Barrier Increase %": avg_barrier_increase,
 
-        # ---------------------------
-        # Portfolio
-        # ---------------------------
+        "Max Drawdown": result_metrics.get("max_drawdown"),
+
         "Start Value": result_metrics.get("start_investment_level"),
         "End Value": result_metrics.get("end_investment_level"),
-
-        # (optional but recommended: remove if redundant)
-        # "Cumulative Value": result.get("cumulative_value"),
-
-        # ---------------------------
-        # Performance
-        # ---------------------------
-        "Total Profit": result_metrics.get("total_profit"),
-        "ROI %": result_metrics.get("total_return"),
-
-        "Max Drawdown %": result_metrics.get("max_drawdown"),
-        "Sharpe Ratio": result_metrics.get("sharpe_ratio"),
-        "Sortino Ratio": result_metrics.get("sortino_ratio"),
-
-        # ---------------------------
-        # Trades
-        # ---------------------------
-        "Trades": result_metrics.get("trades_count"),
-        "Closed Trades": result_metrics.get("closed_trades"),
-        "Active Trades": result_metrics.get("active_trades"),
-
-        "Sells": result_metrics.get("sells_count"),
-        "Knockouts": result_metrics.get("knockouts_count"),
-        "Not Enough Money": result_metrics.get("not_enough_money_count"),
-
-        # ---------------------------
-        # Capital Efficiency
-        # ---------------------------
-        "Total Invested": result_metrics.get("total_invested_sum"),
-        "Losses": result_metrics.get("loss_sum"),
+        "start_loss_sum": result_metrics.get("start_loss_sum"),
+        "start_total_return": result_metrics.get("start_total_return"), 
+        "end_loss_sum": result_metrics.get("end_loss_sum"),
+        "end_total_return": result_metrics.get("end_total_return"),
+        "start_active_trades": result_metrics.get("start_active_trades"),
+        "start_closed_trades": result_metrics.get("start_closed_trades"),
+        "end_active_trades": result_metrics.get("end_active_trades"),
+        "end_closed_trades": result_metrics.get("end_closed_trades"),
+        "start_sells_count": result_metrics.get("start_sells_count"),
+        "start_knockouts_count": result_metrics.get("start_knockouts_count"),
+        "start_trades_count": result_metrics.get("start_trades_count"),
+        "end_sells_count": result_metrics.get("end_sells_count"),
+        "end_knockouts_count": result_metrics.get("end_knockouts_count"),
+        "end_trades_count": result_metrics.get("end_trades_count"),
     })
 
 summary_df = pd.DataFrame(summary_rows)
+summary_df.columns = (
+    summary_df.columns
+    .str.replace(" ", "_")
+    .str.replace("%", "pct")
+)
 if not summary_df.empty:
     summary_df = summary_df.sort_values(["Index", "Leverage"]).reset_index(drop=True)
+
+
+
 
 
 df_simple_invest = current.get("df_simple_invest")
@@ -390,20 +387,17 @@ with top:
     st.altair_chart(combined_chart, width="stretch")
 
 
-    top_left, top_right = st.columns([0.7, 0.3])
+    top_left, top_mid, top_right = st.columns([0.35, 0.35, 0.3])
 
     #Metrics of total investment
     with top_left:
 
         with st.container(border=True):
 
-            st.subheader("Current metrics")
+            st.subheader("Starting metrics")
 
-            col1, col2, col3, col4, col5 = st.columns(5)
+            col1, col2 = st.columns(2)
 
-            # ---------------------------
-            # Derived portfolio changes
-            # ---------------------------
             investment_change = metrics["end_investment_level"] - metrics["start_investment_level"]
 
             investment_change_pct = (
@@ -412,9 +406,6 @@ with top:
                 else 0
             )
 
-            # ---------------------------
-            # PRE-CALCULATIONS
-            # ---------------------------
             investment_change = metrics["end_investment_level"] - metrics["start_investment_level"]
 
             investment_change_pct = (
@@ -423,93 +414,127 @@ with top:
                 else 0
             )
 
-            roi = metrics.get("total_return")
-            trades = metrics.get("trades_count") or 0
+            start_trades = metrics["start_trades_count"]
+            end_trades = metrics["end_trades_count"]
 
-
-            # ---------------------------
-            # COL 1 – Portfolio Value
-            # ---------------------------
             with col1:
+
                 st.metric(
-                    "Portfolio Value (End)",
-                    f"€ {metrics['end_investment_level']:,.2f}".replace(",", " "),
-                    f"{investment_change_pct:+.2f} % vs start"
+                    "Portfolio Value (Start)",
+                    f"€ {metrics['start_investment_level']:,.2f}".replace(",", " ")
+                    #f"{investment_change_pct:+.2f} % from € {metrics['start_investment_level']:,.2f}"
                 )
 
                 st.metric(
-                    "Index Level",
-                    f"{float(df_all_index['index_value'].iloc[-1]):,.3f}".replace(",", " ")
-                )
-
-
-            # ---------------------------
-            # COL 2 – Performance
-            # ---------------------------
-            with col2:
-                st.metric(
-                    "Profit",
-                    f"€ {metrics['total_profit']:,.2f}".replace(",", " ")
+                    "Invested Capital (Start)",
+                    f"€ {metrics['start_total_invested_sum']:,.2f}".replace(",", " ")
                 )
 
                 st.metric(
-                    "ROI",
-                    f"{roi} %" if roi is not None else "N/A"
+                    "Profit (Start)",
+                    f"€ {metrics['start_total_profit']:,.2f}".replace(",", " ")
                 )
 
+                st.metric(
+                    "ROI (Start)",
+                    f"{metrics['start_total_return']} %" if metrics['start_total_return'] is not None else "N/A"
+                )
 
-            # ---------------------------
-            # COL 3 – Risk
-            # ---------------------------
-            with col3:
                 st.metric(
                     "Max Drawdown",
                     f"{metrics.get('max_drawdown')} %"
                     if metrics.get("max_drawdown") is not None else "N/A"
                 )
 
-                st.metric(
-                    "Sharpe Ratio",
-                    f"{metrics.get('sharpe_ratio')}"
-                    if metrics.get("sharpe_ratio") is not None else "N/A"
-                )
 
+            with col2:
 
-            # ---------------------------
-            # COL 4 – Trade Breakdown
-            # ---------------------------
-            with col4:
-                st.metric(
-                    "Trades",
-                    f"{trades}"
+                st.metric (
+                    "Trades (Start)",
+                    f"{start_trades}"
                 )
 
                 st.metric(
-                    "Knockouts",
-                    f"{metrics['knockouts_count']}",
-                    f"{round(metrics['knockouts_count'] / trades * 100 if trades else 0, 2)} %"
+                    "Knockouts (Start)",
+                    f"{metrics['start_knockouts_count']}",
+                    f"{round(metrics['start_knockouts_count'] / start_trades * 100 if start_trades else 0, 2)} %"
                 )
 
                 st.metric(
-                    "Sells",
-                    f"{metrics['sells_count']}"
-                )
-
-
-            # ---------------------------
-            # COL 5 – Capital Efficiency
-            # ---------------------------
-            with col5:
-                st.metric(
-                    "Invested Capital",
-                    f"€ {metrics['total_invested_sum']:,.2f}".replace(",", " ")
+                    "Sells (Start)",
+                    f"{metrics['start_sells_count']}"
                 )
 
                 st.metric(
-                    "Active Positions",
-                    f"{metrics['active_trades']}",
-                    f"{round(metrics['active_trades'] / trades * 100 if trades else 0, 2)} %"
+                    "Active Positions (Start)",
+                    f"{metrics['start_active_trades']}",
+                    f"{round(metrics['start_active_trades'] / start_trades * 100 if start_trades else 0, 2)} %"
                 )
+
+    with top_mid:
+
+        with st.container(border=True):
+
+            st.subheader("End metrics")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.metric(
+                    "Portfolio Value (End)",
+                    f"€ {metrics['end_investment_level']:,.2f}".replace(",", " ")
+                    #f"{investment_change_pct:+.2f} % from € {metrics['start_investment_level']:,.2f}"
+                )
+
+                st.metric(
+                    "Invested Capital (End)",
+                    f"€ {metrics['end_total_invested_sum']:,.2f}".replace(",", " ")
+                )
+
+                st.metric(
+                    "Profit (End)",
+                    f"€ {metrics['end_total_profit']:,.2f}".replace(",", " ")
+                )
+
+                st.metric(
+                    "ROI (End)",
+                    f"{metrics['end_total_return']} %" if metrics['end_total_return'] is not None else "N/A"
+                )
+
+                st.metric(
+                    "Max Drawdown",
+                    f"{metrics.get('max_drawdown')} %"
+                    if metrics.get("max_drawdown") is not None else "N/A"
+                )
+
+
+            with col2:
+
+                st.metric (
+                    "Trades (End)",
+                    f"{end_trades}"
+                )
+
+                st.metric(
+                    "Knockouts (End)",
+                    f"{metrics['end_knockouts_count']}",
+                    f"{round(metrics['end_knockouts_count'] / end_trades * 100 if end_trades else 0, 2)} %"
+                )
+
+                st.metric(
+                    "Sells (End)",
+                    f"{metrics['end_sells_count']}"
+                )
+
+                st.metric(
+                    "Active Positions (End)",
+                    f"{metrics['end_active_trades']}",
+                    f"{round(metrics['end_active_trades'] / end_trades * 100 if end_trades else 0, 2)} %"
+                )
+
+            
+
 
     #Settings for Dashboard
     with top_right:
@@ -745,7 +770,10 @@ with bottom:
                 st.metric("Avg. Annual Barrier Increase", f"{avg_annual_barrier_increase:.2f} %")
 
             with col2:
-                starting_investment = round(selected_row_data['starting_investment'], 2)
+                start_investment = round(
+                    selected_row_data.get('start_investment', selected_row_data.get('starting_investment', 0)),
+                    2,
+                )
 
             with col3:
                 if selected_row_data['active']:
@@ -768,7 +796,7 @@ with bottom:
                 st.metric("Profit", f"€ {profit_value:,.2f}".replace(",", " "))
 
             with col6:
-                indiv_return  = round( ((profit_value / starting_investment if starting_investment != 0 else 0)*100), 2)
+                indiv_return = round(((profit_value / start_investment if start_investment != 0 else 0) * 100), 2)
                 st.metric("ROI", f"{indiv_return} %")
 
         else:
