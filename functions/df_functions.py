@@ -104,108 +104,109 @@ def prepare_investment_data(df_all_index):
 
 #Calculating metrics and returning them as one
 def calculate_metrics(df_investment, scope="Complete Timeline"):
-
     df_full = df_investment.sort_values("date")
-
     if df_full.empty:
-        return {}
+        return {
+            "scope": scope,
+            "start_investment_level": 0,
+            "end_investment_level": 0,
+            "start_loss_sum": 0,
+            "start_total_return": 0.0,
+            "end_loss_sum": 0,
+            "end_total_return": 0.0,
+            "start_active_trades": 0,
+            "start_closed_trades": 0,
+            "end_active_trades": 0,
+            "end_closed_trades": 0,
+            "start_sells_count": 0,
+            "start_knockouts_count": 0,
+            "start_trades_count": 0,
+            "end_sells_count": 0,
+            "end_knockouts_count": 0,
+            "end_trades_count": 0,
+            "start_total_invested_sum": 0,
+            "end_total_invested_sum": 0,
+            "start_total_profit": 0,
+            "end_total_profit": 0,
+            "max_drawdown": None
+        }
 
-
+    # 1. Identify the bounds of the specific crisis scope
     if scope != "Complete Timeline":
         df_trades = df_full[df_full["market_situation"] == scope]
+        if df_trades.empty:
+            df_trades = df_full
+        crisis_start = df_trades["date"].iloc[0]
+        crisis_end = df_trades["date"].iloc[-1]
     else:
         df_trades = df_full
+        crisis_start = df_full["date"].iloc[0]
+        crisis_end = df_full["date"].iloc[-1]
 
-    if df_trades.empty:
-        df_trades = df_full
+    # 2. Get accurate portfolio investment levels at both markers
+    start_state = df_trades[df_trades["date"] == crisis_start]
+    end_state = df_trades[df_trades["date"] == crisis_end]
 
-    final_trades = df_trades.groupby("inv_id").last()
+    start_investment_level = round(start_state["cumulative_investment_value"].iloc[0], 2) if not start_state.empty else 0
+    end_investment_level = round(end_state["cumulative_investment_value"].iloc[-1], 2) if not end_state.empty else 0
 
-    crisis_start = (
-        df_full.loc[
-            df_full["market_situation"] == scope,
-            "date"
-        ].min()
-    )
+    # -------------------------------------------------------------
+    # THING 1: Cumulative snapshot from very beginning TILL crisis start
+    # -------------------------------------------------------------
+    trades_at_start = df_full[df_full["date"] <= crisis_start].groupby("inv_id").last()
+    trades_at_start = trades_at_start[trades_at_start["closing_reason"] != 2] # Drop placeholders
 
-    crisis_end = (
-        df_full.loc[
-            df_full["market_situation"] == scope,
-            "date"
-        ].max()
-    )
+    start_total_profit = round(trades_at_start["profit"].sum(), 2)
+    start_total_invested_sum = round(trades_at_start["starting_investment"].sum(), 2)
+    start_loss_sum = round(trades_at_start.loc[trades_at_start["closing_reason"] == 0, "starting_investment"].sum(), 2)
+    start_total_return = round(start_total_profit / start_total_invested_sum * 100, 2) if start_total_invested_sum > 0 else 0.0
 
+    start_active_trades = int(trades_at_start["active"].sum())
+    start_closed_trades = int((~trades_at_start["active"].astype(bool)).sum())
+    start_sells_count = int((trades_at_start["closing_reason"] == 1).sum())
+    start_knockouts_count = int((trades_at_start["closing_reason"] == 0).sum())
+    start_trades_count = len(trades_at_start)
 
-    equity = df_trades["cumulative_investment_value"]
+    # -------------------------------------------------------------
+    # THING 2: Cumulative snapshot moving further TILL crisis end
+    # -------------------------------------------------------------
+    trades_at_end = df_full[df_full["date"] <= crisis_end].groupby("inv_id").last()
+    trades_at_end = trades_at_end[trades_at_end["closing_reason"] != 2]
 
-    start_investment_level = round(df_trades.loc[df_trades["date"] == crisis_start, "cumulative_investment_value"].iloc[0], 2)
-    end_investment_level = round(df_trades.loc[df_trades["date"] == crisis_end, "cumulative_investment_value"].iloc[0], 2)
+    end_total_profit = round(trades_at_end["profit"].sum(), 2)
+    end_total_invested_sum = round(trades_at_end["starting_investment"].sum(), 2)
+    end_loss_sum = round(trades_at_end.loc[trades_at_end["closing_reason"] == 0, "starting_investment"].sum(), 2)
+    end_total_return = round(end_total_profit / end_total_invested_sum * 100, 2) if end_total_invested_sum > 0 else 0.0
 
-    start_total_profit = round(final_trades.loc[final_trades["date"] == crisis_start, "profit"].sum(), 2)
-    end_total_profit = round(final_trades.loc[final_trades["date"] == crisis_end, "profit"].sum(), 2)
+    end_active_trades = int(trades_at_end["active"].sum())
+    end_closed_trades = int((~trades_at_end["active"].astype(bool)).sum())
+    end_sells_count = int((trades_at_end["closing_reason"] == 1).sum())
+    end_knockouts_count = int((trades_at_end["closing_reason"] == 0).sum())
+    end_trades_count = len(trades_at_end)
 
-    start_total_invested_sum = round(final_trades.loc[(final_trades["date"] == crisis_start) & (final_trades["closing_reason"] != 2), "starting_investment"].sum(), 2)
-    start_loss_sum = round(final_trades.loc[(final_trades["date"] == crisis_start) & (final_trades["closing_reason"] == 0), "starting_investment"].sum(), 2)
-    start_total_return = round(start_total_profit / start_total_invested_sum * 100, 2) if start_total_invested_sum > 0 else None
-
-    end_total_invested_sum = round(final_trades.loc[(final_trades["date"] == crisis_end) & (final_trades["closing_reason"] != 2), "starting_investment"].sum(), 2)
-    end_loss_sum = round(final_trades.loc[(final_trades["date"] == crisis_end) & (final_trades["closing_reason"] == 0), "starting_investment"].sum(), 2)
-    end_total_return = round(end_total_profit / end_total_invested_sum * 100, 2) if end_total_invested_sum > 0 else None
-
-    start_active_trades = int(final_trades.loc[final_trades["date"] == crisis_start, "active"].sum())
-    start_closed_trades = int((~final_trades.loc[final_trades["date"] == crisis_start, "active"]).sum())
-
-    end_active_trades = int(final_trades.loc[final_trades["date"] == crisis_end, "active"].sum())
-    end_closed_trades = int((~final_trades.loc[final_trades["date"] == crisis_end, "active"]).sum())
-
-    start_sells_count = int(((final_trades["date"] == crisis_start) & (final_trades["closing_reason"] == 1)).sum())
-    start_knockouts_count = int(((final_trades["date"] == crisis_start) & (final_trades["closing_reason"] == 0)).sum())
-    start_trades_count = int(((final_trades["date"] == crisis_start) & (final_trades["closing_reason"] != 2)).sum())
-
-    end_sells_count = int(((final_trades["date"] == crisis_end) & (final_trades["closing_reason"] == 1)).sum())
-    end_knockouts_count = int(((final_trades["date"] == crisis_end) & (final_trades["closing_reason"] == 0)).sum())
-    end_trades_count = int(((final_trades["date"] == crisis_end) & (final_trades["closing_reason"] != 2)).sum())
-
-
-    running_max = equity.cummax()
-    drawdown = (equity - running_max) / running_max
-
-    max_drawdown = (
-        round(drawdown.min() * 100, 2) if not drawdown.empty else None)
-
-
+    # 3. Consolidate into metric dictionary
     return {
-        "max_drawdown": max_drawdown,
-
+        "scope": scope,
         "start_investment_level": start_investment_level,
         "end_investment_level": end_investment_level,
-
-        "start_total_profit": start_total_profit,
-        "end_total_profit": end_total_profit,
-
+        "start_loss_sum": start_loss_sum,
+        "start_total_return": start_total_return,
+        "end_loss_sum": end_loss_sum,
+        "end_total_return": end_total_return,
+        "start_active_trades": start_active_trades,
+        "start_closed_trades": start_closed_trades,
+        "end_active_trades": end_active_trades,
+        "end_closed_trades": end_closed_trades,
+        "start_sells_count": start_sells_count,
+        "start_knockouts_count": start_knockouts_count,
+        "start_trades_count": start_trades_count,
+        "end_sells_count": end_sells_count,
+        "end_knockouts_count": end_knockouts_count,
+        "end_trades_count": end_trades_count,
         "start_total_invested_sum": start_total_invested_sum,
         "end_total_invested_sum": end_total_invested_sum,
-
-        "start_loss_sum": start_loss_sum,
-        "end_loss_sum": end_loss_sum,
-
-        "end_total_return": end_total_return,
-        "start_total_return": start_total_return,
-        
-        "start_active_trades": start_active_trades,
-        "end_active_trades": end_active_trades,
-
-        "start_closed_trades": start_closed_trades,
-        "end_closed_trades": end_closed_trades,
-
-        "start_sells_count": start_sells_count,
-        "end_sells_count": end_sells_count,
-
-        "start_knockouts_count": start_knockouts_count,
-        "end_knockouts_count": end_knockouts_count,
-
-        "end_trades_count": end_trades_count,
-        "start_trades_count": start_trades_count,
+        "start_total_profit": start_total_profit,
+        "end_total_profit": end_total_profit  
     }
 
 # Precompute metrics for all scopes
