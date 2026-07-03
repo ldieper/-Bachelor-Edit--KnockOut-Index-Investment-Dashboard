@@ -150,9 +150,14 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
     start_investment_level = round(start_state["cumulative_investment_value"].iloc[0], 2) if not start_state.empty else 0
     end_investment_level = round(end_state["cumulative_investment_value"].iloc[-1], 2) if not end_state.empty else 0
 
-    # -------------------------------------------------------------
-    # THING 1: Cumulative snapshot from very beginning TILL crisis start
-    # -------------------------------------------------------------
+    equity = df_trades["cumulative_investment_value"]
+
+    max_drawdown = (
+        round((((equity / equity.cummax()) - 1).min()) * 100, 2)
+        if not equity.empty
+        else None
+    )
+
     trades_at_start = df_full[df_full["date"] <= crisis_start].groupby("inv_id").last()
     trades_at_start = trades_at_start[trades_at_start["closing_reason"] != 2] # Drop placeholders
 
@@ -167,9 +172,6 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
     start_knockouts_count = int((trades_at_start["closing_reason"] == 0).sum())
     start_trades_count = len(trades_at_start)
 
-    # -------------------------------------------------------------
-    # THING 2: Cumulative snapshot moving further TILL crisis end
-    # -------------------------------------------------------------
     trades_at_end = df_full[df_full["date"] <= crisis_end].groupby("inv_id").last()
     trades_at_end = trades_at_end[trades_at_end["closing_reason"] != 2]
 
@@ -184,7 +186,6 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
     end_knockouts_count = int((trades_at_end["closing_reason"] == 0).sum())
     end_trades_count = len(trades_at_end)
 
-    # 3. Consolidate into metric dictionary
     return {
         "scope": scope,
         "start_investment_level": start_investment_level,
@@ -206,7 +207,8 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
         "start_total_invested_sum": start_total_invested_sum,
         "end_total_invested_sum": end_total_invested_sum,
         "start_total_profit": start_total_profit,
-        "end_total_profit": end_total_profit  
+        "end_total_profit": end_total_profit, 
+        "max_drawdown": max_drawdown 
     }
 
 # Precompute metrics for all scopes

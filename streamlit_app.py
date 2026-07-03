@@ -145,32 +145,36 @@ summary_rows.append({
 
     "Max Drawdown": result_metrics.get("max_drawdown"),
 
-    # Keys updated to match the capitalization returned by the new calculate_metrics
     "start_investment_level": result_metrics.get("start_investment_level"),
     "end_investment_level": result_metrics.get("end_investment_level"),
     
     "start_loss_sum": result_metrics.get("start_loss_sum"),
-    "start_total_return": result_metrics.get("start_total_return"), 
     "end_loss_sum": result_metrics.get("end_loss_sum"),
-    "end_total_return": result_metrics.get("end_total_return"),
+
     "start_total_invested_sum": result_metrics.get("start_total_invested_sum"),
     "end_total_invested_sum": result_metrics.get("end_total_invested_sum"),
+
+    "start_total_return": result_metrics.get("start_total_return"), 
+    "end_total_return": result_metrics.get("end_total_return"),
 
     "start_total_profit" : result_metrics.get("start_total_profit"),
     "end_total_profit" : result_metrics.get("end_total_profit"),
     
     "start_active_trades": result_metrics.get("start_active_trades"),
-    "start_closed_trades": result_metrics.get("start_closed_trades"),
     "end_active_trades": result_metrics.get("end_active_trades"),
+
+    "start_closed_trades": result_metrics.get("start_closed_trades"),
     "end_closed_trades": result_metrics.get("end_closed_trades"),
     
     "start_sells_count": result_metrics.get("start_sells_count"),
-    "start_knockouts_count": result_metrics.get("start_knockouts_count"),
-    "start_trades_count": result_metrics.get("start_trades_count"),
-    
     "end_sells_count": result_metrics.get("end_sells_count"),
+
+    "start_knockouts_count": result_metrics.get("start_knockouts_count"),
     "end_knockouts_count": result_metrics.get("end_knockouts_count"),
-    "end_trades_count": result_metrics.get("end_trades_count"),
+
+    "start_trades_count": result_metrics.get("start_trades_count"),
+    "end_trades_count": result_metrics.get("end_trades_count")
+
 })
 
 summary_df = pd.DataFrame(summary_rows)
@@ -423,11 +427,6 @@ with top:
                 )
 
                 st.metric(
-                    "Profit (Start)",
-                    f"€ {metrics['start_total_profit']:,.2f}".replace(",", " ")
-                )
-
-                st.metric(
                     "ROI (Start)",
                     f"{metrics['start_total_return']} %" if metrics['start_total_return'] is not None else "N/A"
                 )
@@ -436,6 +435,11 @@ with top:
                     "Max Drawdown",
                     f"{metrics.get('max_drawdown')} %"
                     if metrics.get("max_drawdown") is not None else "N/A"
+                )
+                
+                st.metric(
+                    "Profit (Start)",
+                    f"€ {metrics['start_total_profit']:,.2f}".replace(",", " ")
                 )
 
 
@@ -461,6 +465,11 @@ with top:
                     f"{metrics['start_active_trades']}"
                 )
 
+                st.metric(
+                    "Losses (Start)",
+                    f"€ {metrics['start_loss_sum']:,.2f}".replace(",", " ")
+                )
+
     with top_mid:
 
         with st.container(border=True):
@@ -480,13 +489,7 @@ with top:
                 st.metric(
                     "Invested Capital (End)",
                     f"€ {metrics['end_total_invested_sum']:,.2f}".replace(",", " "),
-                    f"{round(metrics['end_total_invested_sum'] - metrics['start_total_invested_sum']) }"
-                )
-
-                st.metric(
-                    "Profit (End)",
-                    f"€ {metrics['end_total_profit']:,.2f}".replace(",", " "),
-                    f"{round(metrics['end_total_profit'] - metrics['start_total_profit']) }"
+                    f"€ {round(metrics['end_total_invested_sum'] - metrics['start_total_invested_sum']) }"
                 )
 
                 st.metric(
@@ -501,6 +504,12 @@ with top:
                     if metrics.get("max_drawdown") is not None else "N/A"
                 )
 
+                st.metric(
+                    "Profit (End)",
+                    f"€ {metrics['end_total_profit']:,.2f}".replace(",", " "),
+                    f"€ {round(metrics['end_total_profit'] - metrics['start_total_profit']) }"
+                )
+
 
             with col2:
 
@@ -513,23 +522,28 @@ with top:
                 st.metric(
                     "Knockouts (End)",
                     f"{metrics['end_knockouts_count']}",
-                    f"{metrics['end_knockouts_count'] - metrics['start_knockouts_count']}"
+                    f"{metrics['end_knockouts_count'] - metrics['start_knockouts_count']}",
+                    delta_color="inverse"
                 )
 
                 st.metric(
                     "Sells (End)",
                     f"{metrics['end_sells_count']}",
-                    f"{metrics['end_sells_count'] - metrics['start_sells_count']}"
+                    f"{metrics['end_sells_count'] - metrics['start_sells_count']}"  
                 )
 
                 st.metric(
                     "Active Positions (End)",
                     f"{metrics['end_active_trades']}",
-                    f"{metrics['end_active_trades'] - metrics['start_active_trades']} %"
+                    f"{metrics['end_active_trades'] - metrics['start_active_trades']}"
                 )
 
-            
-
+                st.metric(
+                    "Losses (End)",
+                    f"€ {metrics['end_loss_sum']:,.2f}".replace(",", " "),
+                    f"€ {metrics['end_loss_sum'] - metrics['start_loss_sum']:,.2f}",
+                    delta_color="inverse"
+                )
 
     #Settings for Dashboard
     with top_right:
