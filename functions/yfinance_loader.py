@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import yfinance as yf
 
 # Loads the past 20 years of the chosen products and saves them once. (update for newer data must be done manually!)
-def download_data(tickers=["^GDAXI"]):#, "^GSPC", "^HSI", "^STOXX50E", "EUNL.DE", "^SP500-35", "^SP500-40", "^SP500-45"]): #"^YH103", "^YH206", "^YH311"]):
+def download_data(tickers=["^GDAXI", "^GSPC", "^HSI", "^STOXX50E", "EUNL.DE", "^SP500-35", "^SP500-40", "^SP500-45"]): #"^YH103", "^YH206", "^YH311"]):
     #index: ^GDAXI = DAX, ^GSPC = S&P500, ^HSI = Hang Seng, ^STOXX50E = Euro Stoxx 50
     #EUNL.DE: iShares Core MSCI World UCITS ETF
     #Financial Services: ^SP500-40, ^YH103
@@ -31,7 +31,7 @@ def download_data(tickers=["^GDAXI"]):#, "^GSPC", "^HSI", "^STOXX50E", "EUNL.DE"
 
 
 # Updates the downloaded indices to the newest trading day (fills gap to old data)
-def update_data(tickers=["^GDAXI", "^GSPC", "^HSI"]):
+def update_data(tickers=["^GDAXI", "^GSPC", "^HSI", "^STOXX50E", "EUNL.DE", "^SP500-35", "^SP500-40", "^SP500-45"]):
     for ticker in tickers:
         file_path = Path(f"index_data/{ticker}.parquet")
         if not file_path.exists():
