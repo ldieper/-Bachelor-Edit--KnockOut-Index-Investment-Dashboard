@@ -138,44 +138,44 @@ for (index_name, leverage), result in st.session_state.all_results.items():
 
 
 
-summary_rows.append({
-    "Index": index_name,
-    "Leverage": leverage,
-    "Average Barrier Increase %": avg_barrier_increase,
+    summary_rows.append({
+        "Index": index_name,
+        "Leverage": leverage,
+        "Average Barrier Increase %": avg_barrier_increase,
 
-    "Max Drawdown": result_metrics.get("max_drawdown"),
+        "Max Drawdown": result_metrics.get("max_drawdown"),
 
-    "start_investment_level": result_metrics.get("start_investment_level"),
-    "end_investment_level": result_metrics.get("end_investment_level"),
-    
-    "start_loss_sum": result_metrics.get("start_loss_sum"),
-    "end_loss_sum": result_metrics.get("end_loss_sum"),
+        "start_investment_level": result_metrics.get("start_investment_level"),
+        "end_investment_level": result_metrics.get("end_investment_level"),
+        
+        "start_loss_sum": result_metrics.get("start_loss_sum"),
+        "end_loss_sum": result_metrics.get("end_loss_sum"),
 
-    "start_total_invested_sum": result_metrics.get("start_total_invested_sum"),
-    "end_total_invested_sum": result_metrics.get("end_total_invested_sum"),
+        "start_total_invested_sum": result_metrics.get("start_total_invested_sum"),
+        "end_total_invested_sum": result_metrics.get("end_total_invested_sum"),
 
-    "start_total_return": result_metrics.get("start_total_return"), 
-    "end_total_return": result_metrics.get("end_total_return"),
+        "start_total_return": result_metrics.get("start_total_return"), 
+        "end_total_return": result_metrics.get("end_total_return"),
 
-    "start_total_profit" : result_metrics.get("start_total_profit"),
-    "end_total_profit" : result_metrics.get("end_total_profit"),
-    
-    "start_active_trades": result_metrics.get("start_active_trades"),
-    "end_active_trades": result_metrics.get("end_active_trades"),
+        "start_total_profit" : result_metrics.get("start_total_profit"),
+        "end_total_profit" : result_metrics.get("end_total_profit"),
+        
+        "start_active_trades": result_metrics.get("start_active_trades"),
+        "end_active_trades": result_metrics.get("end_active_trades"),
 
-    "start_closed_trades": result_metrics.get("start_closed_trades"),
-    "end_closed_trades": result_metrics.get("end_closed_trades"),
-    
-    "start_sells_count": result_metrics.get("start_sells_count"),
-    "end_sells_count": result_metrics.get("end_sells_count"),
+        "start_closed_trades": result_metrics.get("start_closed_trades"),
+        "end_closed_trades": result_metrics.get("end_closed_trades"),
+        
+        "start_sells_count": result_metrics.get("start_sells_count"),
+        "end_sells_count": result_metrics.get("end_sells_count"),
 
-    "start_knockouts_count": result_metrics.get("start_knockouts_count"),
-    "end_knockouts_count": result_metrics.get("end_knockouts_count"),
+        "start_knockouts_count": result_metrics.get("start_knockouts_count"),
+        "end_knockouts_count": result_metrics.get("end_knockouts_count"),
 
-    "start_trades_count": result_metrics.get("start_trades_count"),
-    "end_trades_count": result_metrics.get("end_trades_count")
+        "start_trades_count": result_metrics.get("start_trades_count"),
+        "end_trades_count": result_metrics.get("end_trades_count")
 
-})
+    })
 
 summary_df = pd.DataFrame(summary_rows)
 summary_df.columns = (
