@@ -180,7 +180,8 @@ for (index_name, leverage), result in st.session_state.all_results.items():
 summary_df = pd.DataFrame(summary_rows)
 summary_df.columns = (
     summary_df.columns
-    .str.replace(" ", "_")
+    .str.replace("_", "")
+    .str.replace(" ", "")
     .str.replace("%", "pct")
 )
 if not summary_df.empty:
