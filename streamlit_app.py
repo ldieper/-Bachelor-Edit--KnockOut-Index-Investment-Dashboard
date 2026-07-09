@@ -147,23 +147,23 @@ for (index_name, leverage), result in st.session_state.all_results.items():
 
         "start_investment_level": result_metrics.get("start_investment_level"),
         "end_investment_level": result_metrics.get("end_investment_level"),
-        "diff_investment_level": result_metrics.get("end_investment_level") - result_metrics.get("start_investment_level"),
+        "diff_investment_level": round(result_metrics.get("end_investment_level") - result_metrics.get("start_investment_level"), 2),
         
         "start_loss_sum": result_metrics.get("start_loss_sum"),
         "end_loss_sum": result_metrics.get("end_loss_sum"),
-        "diff_loss_sum": result_metrics.get("end_loss_sum") - result_metrics.get("start_loss_sum"),
+        "diff_loss_sum": round(result_metrics.get("end_loss_sum") - result_metrics.get("start_loss_sum"), 2),
 
         "start_total_invested_sum": result_metrics.get("start_total_invested_sum"),
         "end_total_invested_sum": result_metrics.get("end_total_invested_sum"),
-        "diff_total_invested_sum": result_metrics.get("end_total_invested_sum") - result_metrics.get("start_total_invested_sum"),
+        "diff_total_invested_sum": round(result_metrics.get("end_total_invested_sum") - result_metrics.get("start_total_invested_sum"), 2),
 
         "start_total_return": result_metrics.get("start_total_return"), 
         "end_total_return": result_metrics.get("end_total_return"),
-        "diff_total_return": result_metrics.get("end_total_return") - result_metrics.get("start_total_return"),
+        "diff_total_return": round(result_metrics.get("end_total_return") - result_metrics.get("start_total_return"), 2),
 
         "start_total_profit" : result_metrics.get("start_total_profit"),
         "end_total_profit" : result_metrics.get("end_total_profit"),
-        "diff_total_profit" : result_metrics.get("end_total_profit") - result_metrics.get("start_total_profit"),
+        "diff_total_profit" : round(result_metrics.get("end_total_profit") - result_metrics.get("start_total_profit"), 2),
         
         "start_active_trades": result_metrics.get("start_active_trades"),
         "end_active_trades": result_metrics.get("end_active_trades"),
@@ -183,7 +183,8 @@ for (index_name, leverage), result in st.session_state.all_results.items():
 
         "start_trades_count": result_metrics.get("start_trades_count"),
         "end_trades_count": result_metrics.get("end_trades_count"),
-        "diff_trades_count": result_metrics.get("end_trades_count") - result_metrics.get("start_trades_count"),
+        "started_investments": result_metrics.get("started_investments"),
+        "diff_trades_count": result_metrics.get("end_active_count") - result_metrics.get("start_trades_count"),
 
     })
 

@@ -128,6 +128,7 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
             "end_total_invested_sum": 0,
             "start_total_profit": 0,
             "end_total_profit": 0,
+            "started_investments": 0,
             "max_drawdown": None
         }
 
@@ -186,6 +187,7 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
     end_knockouts_count = int((trades_at_end["closing_reason"] == 0).sum())
     end_trades_count = len(trades_at_end)
 
+
     return {
         "scope": scope,
         "start_investment_level": start_investment_level,
@@ -208,6 +210,7 @@ def calculate_metrics(df_investment, scope="Complete Timeline"):
         "end_total_invested_sum": end_total_invested_sum,
         "start_total_profit": start_total_profit,
         "end_total_profit": end_total_profit, 
+        "started_investments": end_active_trades - start_active_trades,
         "max_drawdown": max_drawdown 
     }
 
