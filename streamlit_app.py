@@ -159,7 +159,7 @@ for (index_name, leverage), result in st.session_state.all_results.items():
 
         "start_total_return": result_metrics.get("start_total_return"), 
         "end_total_return": result_metrics.get("end_total_return"),
-        "diff_total_return": round(result_metrics.get("end_total_return") - result_metrics.get("start_total_return"), 2),
+        "diff_total_return": round((result_metrics.get("end_total_return") - result_metrics.get("start_total_return"))*100, 2),
 
         "start_total_profit" : result_metrics.get("start_total_profit"),
         "end_total_profit" : result_metrics.get("end_total_profit"),
