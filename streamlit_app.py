@@ -215,6 +215,33 @@ if df_simple_invest is None or (hasattr(df_simple_invest, 'empty') and df_simple
 if df_simple_invest is not None and "date" in df_simple_invest.columns and not df_simple_invest.empty:
     df_simple_invest = df_simple_invest.copy()
 
+    if "market_situation" not in df_simple_invest.columns:
+        df_simple_invest = df_simple_invest.merge(
+            df_all_index[["date", "market_situation"]],
+            on="date",
+            how="left"
+        )
+
+    if st.session_state.selected_scope != "Complete Timeline":
+        scope_mask = df_all_index["market_situation"] == st.session_state.selected_scope
+        if scope_mask.any():
+            scope_dates = df_all_index.loc[scope_mask, "date"]
+            start_date = scope_dates.iloc[0]
+            end_date = scope_dates.iloc[-1]
+            df_simple_invest = df_simple_invest.loc[
+                (df_simple_invest["date"] >= start_date) &
+                (df_simple_invest["date"] <= end_date)
+            ].copy()
+            df_plot_index_scope = df_all_index.loc[
+                (df_all_index["date"] >= start_date) &
+                (df_all_index["date"] <= end_date),
+                ["date", "index_value"]
+            ].copy()
+        else:
+            df_plot_index_scope = df_all_index[["date", "index_value"]].copy()
+    else:
+        df_plot_index_scope = df_all_index[["date", "index_value"]].copy()
+
     if "profit" not in df_simple_invest.columns:
         df_simple_invest["profit"] = df_simple_invest["total_value"] - df_simple_invest["total_invested"]
 
@@ -224,12 +251,16 @@ if df_simple_invest is not None and "date" in df_simple_invest.columns and not d
             if row["total_invested"] else 0,
             axis=1,
         )
-    df_plot_simple_invest = pd.merge(
-        df_all_index[["date", "index_value"]],
-        df_simple_invest[["date", "total_value"]],
-        on="date",
-        how="left"
-    )
+
+    if df_simple_invest is not None and not df_simple_invest.empty:
+        df_plot_simple_invest = pd.merge(
+            df_plot_index_scope,
+            df_simple_invest[["date", "total_value"]],
+            on="date",
+            how="left"
+        )
+    else:
+        df_plot_simple_invest = df_plot_index_scope.copy()
 else:
     df_plot_simple_invest = df_all_index[["date", "index_value"]].copy()
 
@@ -683,25 +714,55 @@ with mid:
         profit = final_value - total_invested
         roi_percent = (profit / total_invested) * 100 if total_invested > 0 else 0
 
-        with st.container(border=True):
+        if st.session_state.selected_scope != "Complete Timeline":
+            scope_dates = df_all_index[df_all_index["market_situation"] == st.session_state.selected_scope]["date"]
+            if not scope_dates.empty:
+                scope_start = scope_dates.iloc[0]
+                scope_end = scope_dates.iloc[-1]
+                df_simple_scope = df_simple_invest[
+                    (df_simple_invest["date"] >= scope_start) &
+                    (df_simple_invest["date"] <= scope_end)
+                ].copy() if df_simple_invest is not None and not df_simple_invest.empty else pd.DataFrame()
+                if not df_simple_invest.empty:
+                    start_date = df_simple_invest["date"].min()
+                    end_date = df_simple_invest["date"].max()
 
-            st.subheader("Current metrics")
+                    start_row = df_simple_invest[df_simple_invest["date"] == start_date].iloc[0]
+                    end_row = df_simple_invest[df_simple_invest["date"] == end_date].iloc[0]
 
-            col1, col2, col3 = st.columns(3)
+                    start_value = start_row["total_value"]
+                    end_value = end_row["total_value"]
+                    start_invested = start_row["total_invested"]
+                    end_invested = end_row["total_invested"]
 
-            with col1:
-                st.metric("Investment-Level", f"€ {round(final_value, 2):,.2f}".replace(",", " "))
+                    roi_start = ((start_value - start_invested) / start_invested * 100) if start_invested else 0
+                    roi_end = ((end_value - end_invested) / end_invested * 100) if end_invested else 0
 
-                current_index_value = float(df_plot_simple_invest["index_value"].iloc[-1])
-                st.metric("Index-Level", f"{current_index_value:,.3f}".replace(",", " "))
+        
+            col11, col22 = st.columns(2)
 
-            with col2:
-                st.metric("Profit", f"€ {profit:,.2f}".replace(",", " "))
-                st.metric("Monthly budget", f"€ 500,00")
+            with col11:
+                with st.container(border=True):
+                    st.subheader("Start Metrics of simple investment")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Investment-Level (Start)", f"€ {round(start_invested, 2):,.2f}".replace(",", " "))
+                    
+                    with col2:
+                        st.metric("ROI (Start)", f"{roi_start:.2f} %")
 
-            with col3:
-                st.metric("ROI", f"{roi_percent:.2f} %", )
-                st.metric("Gesamtinvestition", f"€ {total_invested:,.2f}".replace(",", " "))
+            with col22:
+                with st.container(border=True):
+                    st.subheader("End Metrics of simple investment")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Investment-Level (End)", f"€ {round(end_invested, 2):,.2f}".replace(",", " "))
+                        
+                    with col2:
+                        st.metric("ROI (End)", f"{roi_end:.2f} %")
+
 
         with st.container(border=True):
             st.subheader("Final simple investment summary")
