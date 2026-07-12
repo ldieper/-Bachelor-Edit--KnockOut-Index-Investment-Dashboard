@@ -714,64 +714,136 @@ with mid:
         profit = final_value - total_invested
         roi_percent = (profit / total_invested) * 100 if total_invested > 0 else 0
 
-        if st.session_state.selected_scope != "Complete Timeline":
-            scope_dates = df_all_index[df_all_index["market_situation"] == st.session_state.selected_scope]["date"]
-            if not scope_dates.empty:
-                scope_start = scope_dates.iloc[0]
-                scope_end = scope_dates.iloc[-1]
-                df_simple_scope = df_simple_invest[
-                    (df_simple_invest["date"] >= scope_start) &
-                    (df_simple_invest["date"] <= scope_end)
-                ].copy() if df_simple_invest is not None and not df_simple_invest.empty else pd.DataFrame()
-                if not df_simple_invest.empty:
-                    start_date = df_simple_invest["date"].min()
-                    end_date = df_simple_invest["date"].max()
+        start_row = None
+        end_row = None
+        start_value = 0
+        end_value = 0
+        start_invested = 0
+        end_invested = 0
+        start_profit = 0
+        end_profit = 0
+        max_drawdown = None
+        roi_start = 0
+        roi_end = 0
 
-                    start_row = df_simple_invest[df_simple_invest["date"] == start_date].iloc[0]
-                    end_row = df_simple_invest[df_simple_invest["date"] == end_date].iloc[0]
+        if df_simple_invest is not None and not df_simple_invest.empty:
+            start_row = df_simple_invest.iloc[0]
+            end_row = df_simple_invest.iloc[-1]
 
-                    start_value = start_row["total_value"]
-                    end_value = end_row["total_value"]
-                    start_invested = start_row["total_invested"]
-                    end_invested = end_row["total_invested"]
+            start_value = start_row["total_value"]
+            end_value = end_row["total_value"]
 
-                    roi_start = ((start_value - start_invested) / start_invested * 100) if start_invested else 0
-                    roi_end = ((end_value - end_invested) / end_invested * 100) if end_invested else 0
+            start_invested = start_row["total_invested"]
+            end_invested = end_row["total_invested"]
 
-        
-            col11, col22 = st.columns(2)
+            start_profit = start_row["profit"]
+            end_profit = end_row["profit"]
 
-            with col11:
-                with st.container(border=True):
-                    st.subheader("Start Metrics of simple investment")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Investment-Level (Start)", f"€ {round(start_invested, 2):,.2f}".replace(",", " "))
-                    
-                    with col2:
-                        st.metric("ROI (Start)", f"{roi_start:.2f} %")
+            if st.session_state.selected_scope == "Complete Timeline":
+                df_simple_scope = df_simple_invest.copy()
+            else:
+                scope_dates = df_all_index[df_all_index["market_situation"] == st.session_state.selected_scope]["date"]
+                if not scope_dates.empty:
+                    scope_start = scope_dates.iloc[0]
+                    scope_end = scope_dates.iloc[-1]
+                    df_simple_scope = df_simple_invest[
+                        (df_simple_invest["date"] >= scope_start) &
+                        (df_simple_invest["date"] <= scope_end)
+                    ].copy()
+                else:
+                    df_simple_scope = pd.DataFrame()
 
-            with col22:
-                with st.container(border=True):
-                    st.subheader("End Metrics of simple investment")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Investment-Level (End)", f"€ {round(end_invested, 2):,.2f}".replace(",", " "))
-                        
-                    with col2:
-                        st.metric("ROI (End)", f"{roi_end:.2f} %")
+            if not df_simple_scope.empty:
+                start_row = df_simple_scope.iloc[0]
+                end_row = df_simple_scope.iloc[-1]
+
+                start_value = start_row["total_value"]
+                end_value = end_row["total_value"]
+
+                start_invested = start_row["total_invested"]
+                end_invested = end_row["total_invested"]
+
+                start_profit = start_row["profit"]
+                end_profit = end_row["profit"]
+
+                equity = df_simple_scope["total_value"]
+                max_drawdown = (
+                    round((((equity / equity.cummax()) - 1).min()) * 100, 2)
+                    if not equity.empty
+                    else None
+                )
+
+                roi_start = ((start_value - start_invested) / start_invested * 100) if start_invested else 0
+                roi_end = ((end_value - end_invested) / end_invested * 100) if end_invested else 0
+
+        col11, col22 = st.columns(2)
+
+        with col11:
+            with st.container(border=True):
+                st.subheader("Start Metrics of simple investment")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Investment-Level (Start)", f"€ {round(start_invested, 2):,.2f}".replace(",", " "))
+                    st.metric("Profit (Start)", f"€{start_profit:,.2f}".replace(",", " "))
+
+                with col2:
+                    st.metric("ROI (Start)", f"{roi_start:.2f} %")
+                    drawdown_text = f"{max_drawdown:.2f} %" if max_drawdown is not None else "N/A"
+                    st.metric("Max Drawdown", drawdown_text)
+
+        with col22:
+            with st.container(border=True):
+                st.subheader("End Metrics of simple investment")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Investment-Level (End)", f"€ {round(end_invested, 2):,.2f}".replace(",", " "), f"€ {round(end_invested - start_invested, 2):,.2f}")
+                    st.metric("Profit (Start)", f"€{end_profit:,.2f}".replace(",", " "), f"€ {round(end_profit - start_profit, 2):,.2f}")
+
+                with col2:
+                    st.metric("ROI (End)", f"{roi_end:.2f} %", f"{roi_end - roi_start:.2f} %")
+                    drawdown_text = f"{max_drawdown:.2f} %" if max_drawdown is not None else "N/A"
+                    st.metric("Max Drawdown", drawdown_text)    
+
 
 
         with st.container(border=True):
             st.subheader("Final simple investment summary")
             if df_simple_invest is not None and not df_simple_invest.empty:
-                final_summary = pd.DataFrame([final_row])
+                summary_data = {
+                    "total_invested": final_row["total_invested"],
+                    "total_value": final_row["total_value"],
+                    "profit": final_row["profit"],
+                    "roi_percent": final_row["roi_percent"],
+                    "start_value": start_row["total_value"],
+                    "end_value": end_row["total_value"],
+                    "start_invested": start_invested,
+                    "end_invested": end_invested,
+                    "start_profit": start_profit,
+                    "end_profit": end_profit,
+                    "max_drawdown": max_drawdown,
+                }
+                final_summary = pd.DataFrame([summary_data])
+
                 if "date" in final_summary.columns:
                     final_summary["date"] = pd.to_datetime(final_summary["date"]).dt.strftime("%Y-%m-%d")
+
+                display_columns = [
+                    "total_invested",
+                    "total_value",
+                    "profit",
+                    "roi_percent",
+                    "start_value",
+                    "end_value",
+                    "start_invested",
+                    "end_invested",
+                    "start_profit",
+                    "end_profit",
+                    "max_drawdown",
+                ]
                 st.dataframe(
-                    final_summary[["total_invested", "total_value", "profit", "roi_percent"]],
+                    final_summary[display_columns],
                     width="stretch",
                     hide_index=True
                 )
