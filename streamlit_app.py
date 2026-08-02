@@ -725,6 +725,8 @@ with mid:
         max_drawdown = None
         roi_start = 0
         roi_end = 0
+        start_roi = 0
+        end_roi = 0
 
         if df_simple_invest is not None and not df_simple_invest.empty:
             start_row = df_simple_invest.iloc[0]
