@@ -54,7 +54,6 @@ def run_simulation(source, filter, selected_leverage, selected_budget, remaining
             inv.update_current_knockout_barrier(i=i, annual_barrier_increase_pct = annual_cost)
             inv.update_investment_value(i=i)
             inv.update_leverage(i=i)
-            inv.update_profit()
             new_value = inv.get_investment_value()
             cumulative_value += (new_value - old_value)
 
@@ -97,6 +96,7 @@ def run_simulation(source, filter, selected_leverage, selected_budget, remaining
             #Sell because effective leverage falls to  1.5 or below
             if inv.get_leverage() <= 1.5:
                 closing_value = inv.get_investment_value()
+                inv.update_profit()
                 inv.reset_investment(type="sell")
                 #cumulative_value -= closing_value
                 closing_date = dates[i]
